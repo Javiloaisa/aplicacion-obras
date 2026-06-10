@@ -11,5 +11,7 @@ bcrypt==4.0.1
 python-multipart==0.0.20
 slowapi==0.1.9
 Pillow==11.0.0
+pillow-heif>=0.18,<2
+tzdata>=2024.1
 pytest==8.3.4
 httpx==0.28.1

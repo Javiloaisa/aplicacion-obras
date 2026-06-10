@@ -1,0 +1,158 @@
+import uuid
+from datetime import datetime, timezone
+from decimal import Decimal
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from app.deps import (
+    ensure_obra_access,
+    get_current_user,
+    get_db,
+    get_obra_or_404,
+    require_admin,
+)
+from app.models import MediaFile, Obra, ObraAssignment, User, WorkEntry
+from app.schemas.obra import (
+    AssignmentsUpdate,
+    ObraCreate,
+    ObraDetailOut,
+    ObraOut,
+    ObraUpdate,
+)
+from app.schemas.user import UserOut
+
+router = APIRouter(prefix="/obras", tags=["obras"])
+
+
+@router.get("", response_model=list[ObraOut])
+def list_obras(
+    status_filter: Literal["active", "archived"] | None = Query(None, alias="status"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    stmt = select(Obra).order_by(Obra.created_at.desc())
+    if user.role == "admin":
+        if status_filter is not None:
+            stmt = stmt.where(Obra.status == status_filter)
+    else:
+        stmt = stmt.join(ObraAssignment, ObraAssignment.obra_id == Obra.id).where(
+            ObraAssignment.user_id == user.id, Obra.status == "active"
+        )
+    return db.scalars(stmt).all()
+
+
+@router.post("", response_model=ObraOut, status_code=status.HTTP_201_CREATED)
+def create_obra(
+    body: ObraCreate,
+    _admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    obra = Obra(**body.model_dump())
+    db.add(obra)
+    db.commit()
+    return obra
+
+
+@router.get("/{obra_id}", response_model=ObraDetailOut)
+def get_obra(
+    obra_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    obra = get_obra_or_404(db, obra_id)
+    ensure_obra_access(db, obra, user)
+
+    photo_count = db.scalar(
+        select(func.count()).where(
+            MediaFile.obra_id == obra.id, MediaFile.kind == "photo"
+        )
+    )
+    video_count = db.scalar(
+        select(func.count()).where(
+            MediaFile.obra_id == obra.id, MediaFile.kind == "video"
+        )
+    )
+    total_hours = db.scalar(
+        select(func.coalesce(func.sum(WorkEntry.hours), 0)).where(
+            WorkEntry.obra_id == obra.id
+        )
+    )
+
+    return ObraDetailOut(
+        **ObraOut.model_validate(obra).model_dump(),
+        photo_count=photo_count,
+        video_count=video_count,
+        total_hours=Decimal(str(total_hours)),
+    )
+
+
+@router.patch("/{obra_id}", response_model=ObraOut)
+def update_obra(
+    obra_id: uuid.UUID,
+    body: ObraUpdate,
+    _admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    obra = get_obra_or_404(db, obra_id)
+    data = body.model_dump(exclude_unset=True)
+    new_status = data.pop("status", None)
+    for field, value in data.items():
+        setattr(obra, field, value)
+    if new_status is not None and new_status != obra.status:
+        obra.status = new_status
+        obra.archived_at = (
+            datetime.now(timezone.utc) if new_status == "archived" else None
+        )
+    db.add(obra)
+    db.commit()
+    return obra
+
+
+@router.post("/{obra_id}/assignments", response_model=list[UserOut])
+def update_assignments(
+    obra_id: uuid.UUID,
+    body: AssignmentsUpdate,
+    _admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    obra = get_obra_or_404(db, obra_id)
+
+    for user_id in body.add:
+        target = db.get(User, user_id)
+        if target is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Usuario {user_id} no encontrado",
+            )
+        if db.get(ObraAssignment, (obra.id, user_id)) is None:
+            db.add(ObraAssignment(obra_id=obra.id, user_id=user_id))
+
+    for user_id in body.remove:
+        assignment = db.get(ObraAssignment, (obra.id, user_id))
+        if assignment is not None:
+            db.delete(assignment)
+
+    db.commit()
+    return _obra_workers(db, obra.id)
+
+
+@router.get("/{obra_id}/workers", response_model=list[UserOut])
+def list_workers(
+    obra_id: uuid.UUID,
+    _admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    get_obra_or_404(db, obra_id)
+    return _obra_workers(db, obra_id)
+
+
+def _obra_workers(db: Session, obra_id: uuid.UUID) -> list[User]:
+    return db.scalars(
+        select(User)
+        .join(ObraAssignment, ObraAssignment.user_id == User.id)
+        .where(ObraAssignment.obra_id == obra_id)
+        .order_by(User.full_name)
+    ).all()
