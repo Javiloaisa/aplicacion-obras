@@ -1,0 +1,22 @@
+# Three sites, one per subdomain. Automatic HTTPS via Let's Encrypt.
+
+app.{$DOMAIN} {
+	encode gzip
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	reverse_proxy app:80
+}
+
+admin.{$DOMAIN} {
+	encode gzip
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	reverse_proxy admin:80
+}
+
+api.{$DOMAIN} {
+	encode gzip
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	request_body {
+		max_size 250MB
+	}
+	reverse_proxy api:8000
+}
