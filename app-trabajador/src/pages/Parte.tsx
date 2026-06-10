@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import Layout from "../components/Layout";
 import { Button, ErrorMessage, Field, Input, Textarea } from "../components/ui";
 import { apiSend } from "../lib/api";
+import { enqueue, isRetryable } from "../lib/offline-queue";
 import type { WorkEntry } from "../lib/types";
 
 function todayISO(): string {
@@ -28,7 +29,7 @@ export default function Parte() {
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState<"sent" | "queued" | null>(null);
 
   const preview = mode === "times" ? computedHours(startTime, endTime) : null;
 
@@ -36,15 +37,22 @@ export default function Parte() {
     event.preventDefault();
     setError("");
     setBusy(true);
+    const body =
+      mode === "times"
+        ? { work_date: workDate, start_time: startTime, end_time: endTime, notes: notes || null }
+        : { work_date: workDate, hours: Number(hours), notes: notes || null };
     try {
-      const body =
-        mode === "times"
-          ? { work_date: workDate, start_time: startTime, end_time: endTime, notes: notes || null }
-          : { work_date: workDate, hours: Number(hours), notes: notes || null };
       await apiSend<WorkEntry>("POST", `/api/v1/obras/${obraId}/entries`, body);
-      setSaved(true);
+      setSaved("sent");
       setTimeout(() => navigate(`/obras/${obraId}`, { replace: true }), 900);
     } catch (err) {
+      if (isRetryable(err) && obraId) {
+        // No connection: queue it and let the worker move on
+        await enqueue({ kind: "entry", obraId, body, createdAt: Date.now() });
+        setSaved("queued");
+        setTimeout(() => navigate(`/obras/${obraId}`, { replace: true }), 1400);
+        return;
+      }
       setError(err instanceof Error ? err.message : "No se pudo guardar el parte");
       setBusy(false);
     }
@@ -54,8 +62,12 @@ export default function Parte() {
     return (
       <Layout title="Parte de horas" back={`/obras/${obraId}`}>
         <div className="py-16 text-center">
-          <div className="mb-3 text-6xl">✅</div>
-          <p className="text-xl font-semibold text-gray-900">Parte guardado</p>
+          <div className="mb-3 text-6xl">{saved === "sent" ? "✅" : "⏳"}</div>
+          <p className="text-xl font-semibold text-gray-900">
+            {saved === "sent"
+              ? "Parte guardado"
+              : "Sin conexión: se enviará automáticamente"}
+          </p>
         </div>
       </Layout>
     );

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth-context";
+import OfflineBanner from "./OfflineBanner";
 
 export default function Layout({
   title,
@@ -41,6 +42,7 @@ export default function Layout({
           </button>
         ) : null}
       </header>
+      <OfflineBanner />
       <main className="mx-auto max-w-lg p-4 pb-8">{children}</main>
     </div>
   );

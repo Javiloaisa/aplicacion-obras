@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import Layout from "../components/Layout";
 import { Button, ErrorMessage, Field, Input } from "../components/ui";
+import { enqueue, isRetryable } from "../lib/offline-queue";
 import { compressPhoto, uploadMediaFile } from "../lib/upload";
 
 interface PendingFile {
@@ -9,7 +10,7 @@ interface PendingFile {
   previewUrl: string;
   isVideo: boolean;
   progress: number; // 0-100
-  status: "pending" | "uploading" | "done" | "error";
+  status: "pending" | "uploading" | "done" | "queued" | "error";
   error?: string;
 }
 
@@ -54,7 +55,7 @@ export default function Subida() {
     setBusy(true);
     // Sequential uploads: predictable on poor mobile connections
     for (let i = 0; i < items.length; i++) {
-      if (items[i].status === "done") continue;
+      if (items[i].status === "done" || items[i].status === "queued") continue;
       updateItem(i, { status: "uploading", progress: 0, error: undefined });
       try {
         const file = items[i].isVideo
@@ -65,16 +66,36 @@ export default function Subida() {
         );
         updateItem(i, { status: "done", progress: 100 });
       } catch (err) {
-        updateItem(i, {
-          status: "error",
-          error: err instanceof Error ? err.message : "Error al subir",
-        });
+        if (isRetryable(err)) {
+          // No connection: store in the offline queue (compressed if photo)
+          const file = items[i].isVideo
+            ? items[i].file
+            : await compressPhoto(items[i].file);
+          await enqueue({
+            kind: "media",
+            obraId,
+            blob: file,
+            filename: file.name,
+            mimeType: file.type,
+            caption: caption || null,
+            createdAt: Date.now(),
+          });
+          updateItem(i, { status: "queued" });
+        } else {
+          updateItem(i, {
+            status: "error",
+            error: err instanceof Error ? err.message : "Error al subir",
+          });
+        }
       }
     }
     setBusy(false);
   }
 
-  const allDone = items.length > 0 && items.every((i) => i.status === "done");
+  const allDone =
+    items.length > 0 &&
+    items.every((i) => i.status === "done" || i.status === "queued");
+  const queuedCount = items.filter((i) => i.status === "queued").length;
   const failures = items.filter((i) => i.status === "error").length;
 
   return (
@@ -151,6 +172,11 @@ export default function Subida() {
                       ✅
                     </div>
                   ) : null}
+                  {item.status === "queued" ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-4xl">
+                      ⏳
+                    </div>
+                  ) : null}
                   {item.status === "error" ? (
                     <div className="absolute inset-0 flex items-center justify-center bg-red-600/60 text-4xl">
                       ⚠️
@@ -183,7 +209,9 @@ export default function Subida() {
             {allDone ? (
               <div className="py-4 text-center">
                 <p className="text-xl font-semibold text-gray-900">
-                  ✅ Todo subido ({items.length})
+                  {queuedCount === 0
+                    ? `✅ Todo subido (${items.length})`
+                    : `⏳ ${queuedCount} en cola: se enviarán al recuperar conexión`}
                 </p>
               </div>
             ) : (
