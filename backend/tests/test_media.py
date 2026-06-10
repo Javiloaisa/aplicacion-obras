@@ -220,3 +220,11 @@ def test_other_worker_cannot_delete(
     )
     res = client.delete(f"/api/v1/media/{item['id']}", headers=worker2_headers)
     assert res.status_code == 403
+
+
+def test_recent_media_admin_only(client, worker_headers, admin_headers):
+    res = client.get("/api/v1/media/recent", headers=worker_headers)
+    assert res.status_code == 403
+    res = client.get("/api/v1/media/recent", headers=admin_headers)
+    assert res.status_code == 200
+    assert res.json() == []

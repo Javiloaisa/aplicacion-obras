@@ -1,0 +1,86 @@
+import { useCallback, useEffect, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
+import GaleriaTab from "@/components/obra/GaleriaTab";
+import HorasTab from "@/components/obra/HorasTab";
+import TrabajadoresTab from "@/components/obra/TrabajadoresTab";
+import Layout from "@/components/Layout";
+import { Badge } from "@/components/ui/badge";
+import { TabsBar } from "@/components/ui/tabs";
+import { apiGet } from "@/lib/api";
+import type { ObraDetail, User } from "@/lib/types";
+
+type Tab = "galeria" | "horas" | "trabajadores";
+
+export default function ObraDetalle() {
+  const { obraId } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = (searchParams.get("tab") as Tab) || "galeria";
+  const [obra, setObra] = useState<ObraDetail | null>(null);
+  const [workers, setWorkers] = useState<User[]>([]);
+  const [error, setError] = useState("");
+
+  const loadObra = useCallback(() => {
+    apiGet<ObraDetail>(`/api/v1/obras/${obraId}`)
+      .then(setObra)
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : "Error al cargar la obra"),
+      );
+  }, [obraId]);
+
+  useEffect(() => {
+    loadObra();
+    apiGet<User[]>(`/api/v1/obras/${obraId}/workers`)
+      .then(setWorkers)
+      .catch(() => {});
+  }, [obraId, loadObra]);
+
+  return (
+    <Layout
+      title={obra?.name ?? "Obra"}
+      actions={
+        <Link
+          to="/obras"
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" /> Volver a obras
+        </Link>
+      }
+    >
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+      {obra ? (
+        <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          {obra.status === "archived" ? <Badge variant="secondary">Archivada</Badge> : null}
+          {obra.client_name ? <span>{obra.client_name}</span> : null}
+          {obra.address ? <span>· {obra.address}</span> : null}
+          <span>
+            · {obra.photo_count} fotos · {obra.video_count} vídeos · {obra.total_hours} h
+          </span>
+        </div>
+      ) : null}
+
+      <div className="mb-4">
+        <TabsBar
+          value={tab}
+          onChange={(value) => setSearchParams({ tab: value })}
+          tabs={[
+            { value: "galeria", label: "Galería" },
+            { value: "horas", label: "Horas" },
+            { value: "trabajadores", label: `Trabajadores (${workers.length})` },
+          ]}
+        />
+      </div>
+
+      {obraId ? (
+        <>
+          {tab === "galeria" ? <GaleriaTab obraId={obraId} workers={workers} /> : null}
+          {tab === "horas" ? <HorasTab obraId={obraId} workers={workers} /> : null}
+          {tab === "trabajadores" ? (
+            <TrabajadoresTab obraId={obraId} workers={workers} onChanged={setWorkers} />
+          ) : null}
+        </>
+      ) : null}
+    </Layout>
+  );
+}

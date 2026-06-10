@@ -23,8 +23,9 @@ from app.deps import (
     get_current_user,
     get_db,
     get_obra_or_404,
+    require_admin,
 )
-from app.models import MediaFile, User, WorkEntry
+from app.models import MediaFile, Obra, User, WorkEntry
 from app.schemas.media import MediaListOut, MediaOut, MediaUpdate
 from app.services import storage
 from app.services.thumbnails import generate_thumbnail
@@ -179,6 +180,28 @@ def list_obra_media(
         page_size=page_size,
         pages=max(1, math.ceil(total / page_size)),
     )
+
+
+@router.get("/media/recent", response_model=list[MediaOut])
+def recent_media(
+    limit: int = Query(12, ge=1, le=50),
+    _admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Latest uploads across all obras, for the admin dashboard."""
+    rows = db.execute(
+        select(MediaFile, User.full_name, Obra.name)
+        .join(User, User.id == MediaFile.user_id)
+        .join(Obra, Obra.id == MediaFile.obra_id)
+        .order_by(MediaFile.uploaded_at.desc())
+        .limit(limit)
+    ).all()
+    items = []
+    for media, full_name, obra_name in rows:
+        out = _media_out(media, full_name)
+        out.obra_name = obra_name
+        items.append(out)
+    return items
 
 
 @router.get("/media/{media_id}/file")

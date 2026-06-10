@@ -10,6 +10,7 @@ class MediaOut(BaseModel):
     obra_id: uuid.UUID
     user_id: uuid.UUID
     user_full_name: str | None = None
+    obra_name: str | None = None
     work_entry_id: uuid.UUID | None
     kind: Literal["photo", "video"]
     original_filename: str
