@@ -1,0 +1,129 @@
+def test_list_requires_admin(client, worker_headers):
+    res = client.get("/api/v1/usuarios", headers=worker_headers)
+    assert res.status_code == 403
+
+
+def test_admin_lists_users(client, admin_headers, worker):
+    res = client.get("/api/v1/usuarios", headers=admin_headers)
+    assert res.status_code == 200
+    usernames = [u["username"] for u in res.json()]
+    assert "worker1" in usernames
+    assert "jefe" in usernames
+
+
+def test_create_user_returns_temp_password_once(client, admin_headers):
+    res = client.post(
+        "/api/v1/usuarios",
+        json={"username": "Nuevo.Trabajador", "full_name": "Nuevo Trabajador"},
+        headers=admin_headers,
+    )
+    assert res.status_code == 201
+    data = res.json()
+    assert data["username"] == "nuevo.trabajador"  # stored lowercase
+    assert data["role"] == "worker"
+    assert data["must_change_password"] is True
+    assert len(data["temp_password"]) >= 8
+
+    # Temp password works for login and forces a change
+    login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "username": "nuevo.trabajador",
+            "password": data["temp_password"],
+            "client": "worker_app",
+        },
+    )
+    assert login.status_code == 200
+    assert login.json()["user"]["must_change_password"] is True
+
+    # The listing never exposes passwords
+    listed = client.get("/api/v1/usuarios", headers=admin_headers).json()
+    assert all("temp_password" not in u for u in listed)
+
+
+def test_duplicate_username_rejected(client, admin_headers, worker):
+    res = client.post(
+        "/api/v1/usuarios",
+        json={"username": "worker1", "full_name": "Duplicado"},
+        headers=admin_headers,
+    )
+    assert res.status_code == 409
+
+
+def test_invalid_username_rejected(client, admin_headers):
+    res = client.post(
+        "/api/v1/usuarios",
+        json={"username": "no espacios", "full_name": "X"},
+        headers=admin_headers,
+    )
+    assert res.status_code == 422
+
+
+def test_create_requires_admin(client, worker_headers):
+    res = client.post(
+        "/api/v1/usuarios",
+        json={"username": "intruso", "full_name": "Intruso"},
+        headers=worker_headers,
+    )
+    assert res.status_code == 403
+
+
+def test_deactivate_user(client, admin_headers, worker, worker_headers):
+    res = client.patch(
+        f"/api/v1/usuarios/{worker.id}",
+        json={"is_active": False},
+        headers=admin_headers,
+    )
+    assert res.status_code == 200
+    assert res.json()["is_active"] is False
+    assert res.json()["temp_password"] is None
+
+    # Deactivated user's token stops working
+    res = client.get("/api/v1/entries/mine", headers=worker_headers)
+    assert res.status_code == 401
+
+
+def test_reset_password(client, admin_headers, worker):
+    res = client.patch(
+        f"/api/v1/usuarios/{worker.id}",
+        json={"reset_password": True},
+        headers=admin_headers,
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["must_change_password"] is True
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "username": "worker1",
+            "password": data["temp_password"],
+            "client": "worker_app",
+        },
+    )
+    assert login.status_code == 200
+
+
+def test_admin_cannot_deactivate_self(client, admin_headers, admin):
+    res = client.patch(
+        f"/api/v1/usuarios/{admin.id}",
+        json={"is_active": False},
+        headers=admin_headers,
+    )
+    assert res.status_code == 400
+
+    res = client.patch(
+        f"/api/v1/usuarios/{admin.id}",
+        json={"role": "worker"},
+        headers=admin_headers,
+    )
+    assert res.status_code == 400
+
+
+def test_patch_unknown_user_404(client, admin_headers):
+    res = client.patch(
+        "/api/v1/usuarios/00000000-0000-0000-0000-000000000000",
+        json={"is_active": False},
+        headers=admin_headers,
+    )
+    assert res.status_code == 404

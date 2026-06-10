@@ -8,7 +8,7 @@ from slowapi.errors import RateLimitExceeded
 from app.config import settings
 from app.database import SessionLocal
 from app.ratelimit import limiter
-from app.routers import auth, media, obras, partes
+from app.routers import auth, informes, media, obras, partes, usuarios
 from app.services.seed import seed_admin
 
 
@@ -36,6 +36,8 @@ app.include_router(auth.router, prefix="/api/v1")
 app.include_router(obras.router, prefix="/api/v1")
 app.include_router(partes.router, prefix="/api/v1")
 app.include_router(media.router, prefix="/api/v1")
+app.include_router(informes.router, prefix="/api/v1")
+app.include_router(usuarios.router, prefix="/api/v1")
 
 
 @app.get("/health")
