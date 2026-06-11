@@ -1,13 +1,6 @@
 import type { ReactNode } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import {
-  BarChart3,
-  Building2,
-  HardHat,
-  LayoutDashboard,
-  LogOut,
-  Users,
-} from "lucide-react";
+import { BarChart3, Building2, LayoutDashboard, LogOut, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
@@ -33,10 +26,9 @@ export default function Layout({
 
   return (
     <div className="flex min-h-screen">
-      <aside className="hidden w-56 shrink-0 flex-col border-r bg-background md:flex">
-        <div className="flex items-center gap-2 border-b p-4">
-          <HardHat className="h-6 w-6 text-primary" />
-          <span className="font-bold">Partes de Obra</span>
+      <aside className="hidden w-56 shrink-0 flex-col bg-ink-900 text-gray-300 md:flex">
+        <div className="flex items-center border-b border-ink-700 p-4">
+          <img src="/brand/logo.png" alt="Nido Constructions" className="h-7 w-auto" />
         </div>
         <nav className="flex-1 space-y-1 p-3">
           {NAV.map(({ to, label, icon: Icon, end }) => (
@@ -46,8 +38,10 @@ export default function Layout({
               end={end}
               className={({ isActive }) =>
                 cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                  isActive && "bg-accent text-accent-foreground",
+                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-brand-500 text-ink-900"
+                    : "text-gray-300 hover:bg-white/10 hover:text-white",
                 )
               }
             >
@@ -56,13 +50,13 @@ export default function Layout({
             </NavLink>
           ))}
         </nav>
-        <div className="border-t p-3">
-          <div className="mb-2 truncate px-3 text-sm text-muted-foreground">
+        <div className="border-t border-ink-700 p-3">
+          <div className="mb-2 truncate px-3 text-sm text-gray-400">
             {user?.full_name}
           </div>
           <Button
             variant="ghost"
-            className="w-full justify-start"
+            className="w-full justify-start text-gray-300 hover:bg-white/10 hover:text-white"
             onClick={() => {
               logout();
               navigate("/login", { replace: true });
@@ -75,23 +69,32 @@ export default function Layout({
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top nav */}
-        <nav className="flex items-center gap-1 overflow-x-auto border-b bg-background p-2 md:hidden">
-          {NAV.map(({ to, label, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              className={({ isActive }) =>
-                cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground",
-                  isActive && "bg-accent text-accent-foreground",
-                )
-              }
-            >
-              {label}
-            </NavLink>
-          ))}
-        </nav>
+        <div className="flex items-center gap-2 overflow-x-auto bg-ink-900 p-2 md:hidden">
+          <img
+            src="/brand/logo.png"
+            alt="Nido Constructions"
+            className="h-6 w-auto shrink-0 pl-1 pr-1"
+          />
+          <nav className="flex items-center gap-1">
+            {NAV.map(({ to, label, end }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={end}
+                className={({ isActive }) =>
+                  cn(
+                    "whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-brand-500 text-ink-900"
+                      : "text-gray-300 hover:bg-white/10 hover:text-white",
+                  )
+                }
+              >
+                {label}
+              </NavLink>
+            ))}
+          </nav>
+        </div>
 
         <main className="flex-1 p-4 md:p-6">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">

@@ -16,7 +16,7 @@ export default function OfflineBanner() {
     <button
       type="button"
       onClick={() => void flushQueue()}
-      className="block w-full bg-amber-100 px-4 py-2 text-center text-base font-medium text-amber-900"
+      className="block w-full bg-brand-100 px-4 py-2 text-center text-base font-medium text-brand-900"
     >
       ⏳ {count} {count === 1 ? "elemento pendiente" : "elementos pendientes"} de
       enviar — toca para reintentar

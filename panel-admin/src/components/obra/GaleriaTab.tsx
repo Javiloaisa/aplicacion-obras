@@ -64,6 +64,19 @@ export default function GaleriaTab({
         </Select>
         <Input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} className="w-40" />
         <Input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} className="w-40" />
+        <Button
+          variant="outline"
+          className="ml-auto"
+          disabled={!data || data.total === 0}
+          onClick={() =>
+            apiDownload(
+              `/api/v1/obras/${obraId}/media/export.zip${kind ? `?kind=${kind}` : ""}`,
+              "fotos-obra.zip",
+            )
+          }
+        >
+          <Download /> Descargar ZIP
+        </Button>
       </div>
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}

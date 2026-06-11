@@ -1,5 +1,8 @@
 import math
+import os
+import tempfile
 import uuid
+import zipfile
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Literal
 
@@ -17,6 +20,7 @@ from fastapi import (
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+from starlette.background import BackgroundTask
 
 from app.deps import (
     ensure_obra_access,
@@ -202,6 +206,64 @@ def recent_media(
         out.obra_name = obra_name
         items.append(out)
     return items
+
+
+def _safe_filename(name: str) -> str:
+    keep = "-_.() "
+    cleaned = "".join(c for c in name if c.isalnum() or c in keep).strip()
+    return cleaned or "descarga"
+
+
+def _unique_arcname(filename: str, used: set[str]) -> str:
+    base = _safe_filename(filename)
+    name = base
+    i = 1
+    while name in used:
+        stem, dot, ext = base.rpartition(".")
+        name = f"{stem} ({i}).{ext}" if dot else f"{base} ({i})"
+        i += 1
+    used.add(name)
+    return name
+
+
+@router.get("/obras/{obra_id}/media/export.zip")
+def export_obra_media_zip(
+    obra_id: uuid.UUID,
+    kind: Literal["photo", "video"] | None = None,
+    _admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Download every media file of an obra as a ZIP (admin)."""
+    obra = get_obra_or_404(db, obra_id)
+    filters = [MediaFile.obra_id == obra.id]
+    if kind is not None:
+        filters.append(MediaFile.kind == kind)
+    medias = db.scalars(
+        select(MediaFile).where(*filters).order_by(MediaFile.uploaded_at)
+    ).all()
+    if not medias:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No hay archivos para descargar en esta obra",
+        )
+
+    tmp = tempfile.NamedTemporaryFile(prefix="obra-media-", suffix=".zip", delete=False)
+    tmp.close()
+    used: set[str] = set()
+    # ZIP_STORED: photos/videos are already compressed, so skip recompression
+    with zipfile.ZipFile(tmp.name, "w", zipfile.ZIP_STORED) as zf:
+        for media in medias:
+            src = storage.media_abs_path(media.storage_path)
+            if src.is_file():
+                zf.write(src, _unique_arcname(media.original_filename, used))
+
+    filename = f"{_safe_filename(obra.name)}.zip"
+    return FileResponse(
+        tmp.name,
+        media_type="application/zip",
+        filename=filename,
+        background=BackgroundTask(os.unlink, tmp.name),
+    )
 
 
 @router.get("/media/{media_id}/file")

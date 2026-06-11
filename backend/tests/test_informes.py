@@ -65,7 +65,9 @@ def test_csv_export(client, admin_headers, obra, other_obra, worker, worker2):
     assert "attachment" in res.headers["content-disposition"]
 
     lines = res.text.lstrip("﻿").strip().splitlines()
-    assert lines[0] == "obra;trabajador;fecha;inicio;fin;horas;notas"
+    assert lines[0] == (
+        "obra;trabajador;oficio;fecha;inicio;fin;horas;tarifa_eur_h;coste_eur;notas"
+    )
     assert len(lines) == 4  # header + 3 entries in this obra
     assert "Trabajador Uno" in res.text
     assert "Nave Industrial" not in res.text
@@ -73,6 +75,22 @@ def test_csv_export(client, admin_headers, obra, other_obra, worker, worker2):
 
 def test_csv_export_requires_admin(client, worker_headers):
     res = client.get("/api/v1/informes/horas/export.csv", headers=worker_headers)
+    assert res.status_code == 403
+
+
+def test_pdf_export(client, admin_headers, obra, other_obra, worker, worker2):
+    seed_entries(client, admin_headers, obra, other_obra, worker, worker2)
+    res = client.get(
+        f"/api/v1/informes/horas/export.pdf?obra_id={obra.id}", headers=admin_headers
+    )
+    assert res.status_code == 200
+    assert res.headers["content-type"] == "application/pdf"
+    assert "attachment" in res.headers["content-disposition"]
+    assert res.content[:4] == b"%PDF"
+
+
+def test_pdf_export_requires_admin(client, worker_headers):
+    res = client.get("/api/v1/informes/horas/export.pdf", headers=worker_headers)
     assert res.status_code == 403
 
 
@@ -91,6 +109,37 @@ def test_obra_resumen(client, admin_headers, obra, other_obra, worker, worker2):
     assert data["last_entry_date"] == "2026-06-10"
     assert data["photo_count"] == 0
     assert data["video_count"] == 0
+
+
+def test_horas_report_includes_trade_and_cost(
+    client, admin_headers, db_session, obra, other_obra, worker, worker2
+):
+    from decimal import Decimal
+
+    worker.trade = "Fontanero"
+    worker.hourly_rate = Decimal("20.00")
+    worker2.trade = "Albañil"  # no rate -> cost unknown
+    db_session.commit()
+
+    seed_entries(client, admin_headers, obra, other_obra, worker, worker2)
+
+    data = client.get("/api/v1/informes/horas", headers=admin_headers).json()
+    by_key = {(r["obra_id"], r["user_id"]): r for r in data["rows"]}
+
+    paid = by_key[(str(obra.id), str(worker.id))]
+    assert paid["trade"] == "Fontanero"
+    assert float(paid["cost"]) == 240.0  # 12 h x 20 €
+
+    unpaid = by_key[(str(obra.id), str(worker2.id))]
+    assert unpaid["trade"] == "Albañil"
+    assert unpaid["cost"] is None
+
+    # worker: 12 h here + 5 h in the other obra, both at 20 €
+    assert float(data["total_cost"]) == 340.0
+    by_trade = {t["trade"]: t for t in data["by_trade"]}
+    assert float(by_trade["Fontanero"]["total_hours"]) == 17.0
+    assert float(by_trade["Fontanero"]["cost"]) == 340.0
+    assert by_trade["Albañil"]["cost"] is None
 
 
 def test_obra_resumen_empty_obra(client, admin_headers, other_obra):

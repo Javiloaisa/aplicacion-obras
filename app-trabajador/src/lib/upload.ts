@@ -49,11 +49,13 @@ export function uploadMediaFile(
   file: File,
   caption: string | null,
   onProgress: (percent: number) => void,
+  workEntryId?: string | null,
 ): Promise<MediaItem> {
   return new Promise((resolve, reject) => {
     const form = new FormData();
     form.append("files", file);
     if (caption) form.append("caption", caption);
+    if (workEntryId) form.append("work_entry_id", workEntryId);
 
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `/api/v1/obras/${obraId}/media`);

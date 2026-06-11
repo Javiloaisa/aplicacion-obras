@@ -222,6 +222,31 @@ def test_other_worker_cannot_delete(
     assert res.status_code == 403
 
 
+def test_export_obra_media_zip(client, worker_headers, admin_headers, obra):
+    import zipfile
+
+    upload(client, obra.id, worker_headers, filename="a.jpg")
+    upload(client, obra.id, worker_headers, filename="b.jpg")
+
+    res = client.get(f"/api/v1/obras/{obra.id}/media/export.zip", headers=admin_headers)
+    assert res.status_code == 200
+    assert res.headers["content-type"] == "application/zip"
+    zf = zipfile.ZipFile(io.BytesIO(res.content))
+    names = zf.namelist()
+    assert len(names) == 2
+    assert "a.jpg" in names and "b.jpg" in names
+
+
+def test_export_zip_requires_admin(client, worker_headers, obra):
+    res = client.get(f"/api/v1/obras/{obra.id}/media/export.zip", headers=worker_headers)
+    assert res.status_code == 403
+
+
+def test_export_zip_empty_obra_returns_404(client, admin_headers, obra):
+    res = client.get(f"/api/v1/obras/{obra.id}/media/export.zip", headers=admin_headers)
+    assert res.status_code == 404
+
+
 def test_recent_media_admin_only(client, worker_headers, admin_headers):
     res = client.get("/api/v1/media/recent", headers=worker_headers)
     assert res.status_code == 403

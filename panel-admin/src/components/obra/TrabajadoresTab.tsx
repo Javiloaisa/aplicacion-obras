@@ -69,7 +69,12 @@ export default function TrabajadoresTab({
                 className="flex items-center justify-between rounded-md border bg-card p-3"
               >
                 <div>
-                  <div className="text-sm font-medium">{worker.full_name}</div>
+                  <div className="text-sm font-medium">
+                    {worker.full_name}
+                    {worker.trade ? (
+                      <Badge variant="outline" className="ml-2">{worker.trade}</Badge>
+                    ) : null}
+                  </div>
                   <div className="text-xs text-muted-foreground">@{worker.username}</div>
                 </div>
                 <Button
@@ -102,6 +107,9 @@ export default function TrabajadoresTab({
               <div>
                 <div className="text-sm font-medium">
                   {user.full_name}
+                  {user.trade ? (
+                    <Badge variant="outline" className="ml-2">{user.trade}</Badge>
+                  ) : null}
                   {user.role === "admin" ? (
                     <Badge variant="outline" className="ml-2">admin</Badge>
                   ) : null}

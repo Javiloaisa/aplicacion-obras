@@ -6,8 +6,7 @@ import { apiGet } from "../lib/api";
 import type { ObraDetail } from "../lib/types";
 
 const ACTIONS = [
-  { to: "parte", icon: "➕", label: "Parte de horas", hint: "Registrar horas trabajadas" },
-  { to: "subir", icon: "📷", label: "Subir fotos/vídeos", hint: "Cámara o galería" },
+  { to: "parte", icon: "➕", label: "Parte de horas", hint: "Horas y fotos del trabajo" },
   { to: "actividad", icon: "🕓", label: "Mi actividad", hint: "Mis partes y fotos aquí" },
 ];
 

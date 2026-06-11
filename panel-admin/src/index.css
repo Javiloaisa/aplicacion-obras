@@ -8,8 +8,8 @@
     --foreground: 224 71% 4%;
     --card: 0 0% 100%;
     --card-foreground: 224 71% 4%;
-    --primary: 38 92% 50%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 42 95% 53%; /* Nido amber #f9b414 */
+    --primary-foreground: 222 14% 14%; /* dark ink for contrast on amber */
     --secondary: 220 14% 96%;
     --secondary-foreground: 224 71% 4%;
     --muted: 220 14% 96%;
@@ -20,7 +20,7 @@
     --destructive-foreground: 0 0% 100%;
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 38 92% 50%;
+    --ring: 42 95% 53%;
     --radius: 0.5rem;
   }
 }

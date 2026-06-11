@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { HardHat } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -33,9 +32,11 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <HardHat className="mx-auto h-10 w-10 text-primary" />
-          <CardTitle className="text-xl">Partes de Obra</CardTitle>
-          <CardDescription>Panel de administración</CardDescription>
+          <div className="mx-auto mb-2 w-fit rounded-xl bg-ink-800 px-5 py-3">
+            <img src="/brand/logo.png" alt="Nido Constructions" className="h-8 w-auto" />
+          </div>
+          <CardTitle className="text-xl">Panel de administración</CardTitle>
+          <CardDescription>Partes de obra · Nido Constructions</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

@@ -15,7 +15,7 @@ export function Button({
   variant?: "primary" | "secondary" | "danger";
 }) {
   const styles = {
-    primary: "bg-amber-500 text-white active:bg-amber-600 disabled:bg-amber-300",
+    primary: "bg-brand-500 text-ink-900 active:bg-brand-600 disabled:bg-brand-300 disabled:text-ink-700/60",
     secondary:
       "bg-white text-gray-800 border border-gray-300 active:bg-gray-100 disabled:text-gray-400",
     danger: "bg-red-600 text-white active:bg-red-700 disabled:bg-red-300",
@@ -34,7 +34,7 @@ export function Input({
 }: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className={`min-h-14 w-full rounded-xl border border-gray-300 bg-white px-4 text-lg focus:border-amber-500 focus:outline-none ${className}`}
+      className={`min-h-14 w-full rounded-xl border border-gray-300 bg-white px-4 text-lg focus:border-brand-500 focus:outline-none ${className}`}
       {...props}
     />
   );
@@ -46,7 +46,7 @@ export function Textarea({
 }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <textarea
-      className={`w-full rounded-xl border border-gray-300 bg-white p-4 text-lg focus:border-amber-500 focus:outline-none ${className}`}
+      className={`w-full rounded-xl border border-gray-300 bg-white p-4 text-lg focus:border-brand-500 focus:outline-none ${className}`}
       {...props}
     />
   );
@@ -73,7 +73,7 @@ export function ErrorMessage({ children }: { children: ReactNode }) {
 export function Spinner({ label = "Cargando..." }: { label?: string }) {
   return (
     <div className="flex flex-col items-center gap-3 py-12 text-gray-500">
-      <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-300 border-t-amber-500" />
+      <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-300 border-t-brand-500" />
       <span className="text-base">{label}</span>
     </div>
   );

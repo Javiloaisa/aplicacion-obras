@@ -1,10 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import {
+  Bar,
+  BarChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import AuthImg from "@/components/AuthImg";
 import Layout from "@/components/Layout";
 import { apiGet } from "@/lib/api";
-import { thisWeekRange, todayISO } from "@/lib/format";
+import { formatEur, thisWeekRange, todayISO } from "@/lib/format";
 import type { HorasReport, MediaItem, Obra } from "@/lib/types";
 
 export default function Dashboard() {
@@ -43,41 +51,25 @@ export default function Dashboard() {
     const hours = (existing?.hours ?? 0) + Number(row.total_hours);
     weekByObra.set(row.obra_id, { name: row.obra_name, hours });
   }
+  const obraChart = [...weekByObra.values()]
+    .map((o) => ({ name: o.name, horas: Math.round(o.hours * 100) / 100 }))
+    .sort((a, b) => b.horas - a.horas);
+  const tradeChart = (week?.by_trade ?? []).map((t) => ({
+    name: t.trade || "Sin oficio",
+    horas: Math.round(Number(t.total_hours) * 100) / 100,
+  }));
 
   return (
     <Layout title="Dashboard">
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Obras activas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{obras?.length ?? "—"}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">
-              Horas esta semana
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">
-              {week ? `${week.total_hours} h` : "—"}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">
-              Trabajadores activos hoy
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{today ? activeToday : "—"}</div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard label="Obras activas" value={obras?.length ?? "—"} />
+        <KpiCard label="Horas esta semana" value={week ? `${week.total_hours} h` : "—"} />
+        <KpiCard
+          label="Coste semana"
+          value={week ? formatEur(week.total_cost) : "—"}
+        />
+        <KpiCard label="Trabajadores activos hoy" value={today ? activeToday : "—"} />
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
@@ -86,27 +78,21 @@ export default function Dashboard() {
             <CardTitle>Horas de la semana por obra</CardTitle>
           </CardHeader>
           <CardContent>
-            {weekByObra.size === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Sin partes registrados esta semana.
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {[...weekByObra.entries()]
-                  .sort((a, b) => b[1].hours - a[1].hours)
-                  .map(([obraId, info]) => (
-                    <li key={obraId} className="flex items-center justify-between text-sm">
-                      <Link to={`/obras/${obraId}`} className="hover:underline">
-                        {info.name}
-                      </Link>
-                      <span className="font-semibold">{info.hours} h</span>
-                    </li>
-                  ))}
-              </ul>
-            )}
+            <HoursBarChart data={obraChart} />
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle>Horas de la semana por oficio</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <HoursBarChart data={tradeChart} />
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="mt-6">
         <Card>
           <CardHeader>
             <CardTitle>Últimas subidas</CardTitle>
@@ -115,7 +101,7 @@ export default function Dashboard() {
             {recent && recent.length === 0 ? (
               <p className="text-sm text-muted-foreground">Todavía no hay archivos.</p>
             ) : (
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
                 {recent?.map((item) => (
                   <Link
                     key={item.id}
@@ -147,5 +133,48 @@ export default function Dashboard() {
         </Card>
       </div>
     </Layout>
+  );
+}
+
+function KpiCard({ label, value }: { label: string; value: string | number }) {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm text-muted-foreground">{label}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="text-3xl font-bold">{value}</div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function HoursBarChart({ data }: { data: { name: string; horas: number }[] }) {
+  if (data.length === 0) {
+    return (
+      <p className="py-8 text-center text-sm text-muted-foreground">
+        Sin partes registrados esta semana.
+      </p>
+    );
+  }
+  return (
+    <ResponsiveContainer width="100%" height={Math.max(140, data.length * 40)}>
+      <BarChart data={data} layout="vertical" margin={{ left: 4, right: 24, top: 4, bottom: 4 }}>
+        <XAxis type="number" hide />
+        <YAxis
+          type="category"
+          dataKey="name"
+          width={130}
+          tick={{ fontSize: 12, fill: "#32373c" }}
+          tickLine={false}
+          axisLine={false}
+        />
+        <Tooltip
+          formatter={(value) => [`${value} h`, "Horas"]}
+          cursor={{ fill: "rgba(249,180,20,0.1)" }}
+        />
+        <Bar dataKey="horas" fill="#f9b414" radius={[0, 6, 6, 0]} label={{ position: "right", fontSize: 12, fill: "#32373c" }} />
+      </BarChart>
+    </ResponsiveContainer>
   );
 }

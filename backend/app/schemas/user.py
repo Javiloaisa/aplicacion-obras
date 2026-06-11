@@ -1,8 +1,25 @@
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+# Suggested trades for the UI. Stored as a free string so the list can grow
+# without a migration; the frontend offers these as quick options.
+TRADES = [
+    "Albañil",
+    "Fontanero",
+    "Electricista",
+    "Pintor",
+    "Carpintero",
+    "Encargado",
+    "Peón",
+    "Ferrallista",
+    "Soldador",
+    "Yesero/Escayolista",
+    "Otros",
+]
 
 
 class UserOut(BaseModel):
@@ -13,10 +30,17 @@ class UserOut(BaseModel):
     full_name: str
     email: str | None
     phone: str | None
+    trade: str | None = None
     role: Literal["admin", "worker"]
     is_active: bool
     must_change_password: bool
     created_at: datetime
+
+
+class AdminUserOut(UserOut):
+    """User as seen in the admin panel — includes the sensitive labour rate."""
+
+    hourly_rate: Decimal | None = None
 
 
 class UserCreate(BaseModel):
@@ -24,6 +48,8 @@ class UserCreate(BaseModel):
     full_name: str = Field(min_length=1, max_length=120)
     email: EmailStr | None = None
     phone: str | None = Field(None, max_length=30)
+    trade: str | None = Field(None, max_length=50)
+    hourly_rate: Decimal | None = Field(None, ge=0, le=9999, decimal_places=2)
     role: Literal["admin", "worker"] = "worker"
 
 
@@ -31,11 +57,13 @@ class UserUpdate(BaseModel):
     full_name: str | None = Field(None, min_length=1, max_length=120)
     email: EmailStr | None = None
     phone: str | None = Field(None, max_length=30)
+    trade: str | None = Field(None, max_length=50)
+    hourly_rate: Decimal | None = Field(None, ge=0, le=9999, decimal_places=2)
     role: Literal["admin", "worker"] | None = None
     is_active: bool | None = None
     # When true, a new temporary password is generated and returned once
     reset_password: bool = False
 
 
-class UserWithTempPassword(UserOut):
+class UserWithTempPassword(AdminUserOut):
     temp_password: str | None = None

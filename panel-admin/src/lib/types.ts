@@ -2,12 +2,29 @@
 
 export type Role = "admin" | "worker";
 
+// Suggested trades (mirror of backend TRADES). Stored as a free string.
+export const TRADES = [
+  "Albañil",
+  "Fontanero",
+  "Electricista",
+  "Pintor",
+  "Carpintero",
+  "Encargado",
+  "Peón",
+  "Ferrallista",
+  "Soldador",
+  "Yesero/Escayolista",
+  "Otros",
+];
+
 export interface User {
   id: string;
   username: string;
   full_name: string;
   email: string | null;
   phone: string | null;
+  trade: string | null;
+  hourly_rate: string | null;
   role: Role;
   is_active: boolean;
   must_change_password: boolean;
@@ -96,28 +113,44 @@ export interface HorasRow {
   obra_name: string;
   user_id: string;
   user_full_name: string;
+  trade: string | null;
   total_hours: string;
   entry_count: number;
+  hourly_rate: string | null;
+  cost: string | null;
+}
+
+export interface TradeHoursRow {
+  trade: string | null;
+  total_hours: string;
+  cost: string | null;
 }
 
 export interface HorasReport {
   rows: HorasRow[];
+  by_trade: TradeHoursRow[];
   total_hours: string;
   total_entries: number;
+  total_cost: string | null;
 }
 
 export interface WorkerHoursRow {
   user_id: string;
   user_full_name: string;
+  trade: string | null;
   total_hours: string;
   entry_count: number;
+  hourly_rate: string | null;
+  cost: string | null;
 }
 
 export interface ObraResumen {
   obra_id: string;
   obra_name: string;
   workers: WorkerHoursRow[];
+  by_trade: TradeHoursRow[];
   total_hours: string;
+  total_cost: string | null;
   photo_count: number;
   video_count: number;
   first_entry_date: string | null;

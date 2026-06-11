@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { KeyRound, Plus } from "lucide-react";
+import { KeyRound, Pencil, Plus } from "lucide-react";
 import Layout from "@/components/Layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,13 +24,15 @@ import {
 } from "@/components/ui/table";
 import { apiGet, apiSend } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import type { User, UserWithTempPassword } from "@/lib/types";
+import { formatEur } from "@/lib/format";
+import { TRADES, type User, type UserWithTempPassword } from "@/lib/types";
 
 export default function Usuarios() {
   const { user: me } = useAuth();
   const [users, setUsers] = useState<User[] | null>(null);
   const [error, setError] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editUser, setEditUser] = useState<User | null>(null);
   const [tempPassword, setTempPassword] = useState<{ name: string; password: string } | null>(null);
 
   const load = useCallback(() => {
@@ -76,11 +78,11 @@ export default function Usuarios() {
             <DialogHeader>
               <DialogTitle>Nuevo usuario</DialogTitle>
             </DialogHeader>
-            <NuevoUsuarioForm
-              onCreated={(created) => {
+            <UserForm
+              onSaved={(created) => {
                 setDialogOpen(false);
                 load();
-                if (created.temp_password) {
+                if (created && "temp_password" in created && created.temp_password) {
                   setTempPassword({
                     name: created.full_name,
                     password: created.temp_password,
@@ -100,6 +102,8 @@ export default function Usuarios() {
             <TableRow>
               <TableHead>Nombre</TableHead>
               <TableHead>Usuario</TableHead>
+              <TableHead>Oficio</TableHead>
+              <TableHead className="text-right">Tarifa</TableHead>
               <TableHead>Rol</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
@@ -110,6 +114,10 @@ export default function Usuarios() {
               <TableRow key={user.id}>
                 <TableCell className="font-medium">{user.full_name}</TableCell>
                 <TableCell>@{user.username}</TableCell>
+                <TableCell>{user.trade || <span className="text-muted-foreground">—</span>}</TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {user.hourly_rate ? `${formatEur(user.hourly_rate)}/h` : <span className="text-muted-foreground">—</span>}
+                </TableCell>
                 <TableCell>
                   {user.role === "admin" ? (
                     <Badge>Admin</Badge>
@@ -125,8 +133,11 @@ export default function Usuarios() {
                   )}
                 </TableCell>
                 <TableCell className="space-x-2 text-right">
+                  <Button variant="outline" size="sm" onClick={() => setEditUser(user)}>
+                    <Pencil /> Editar
+                  </Button>
                   <Button variant="outline" size="sm" onClick={() => resetPassword(user)}>
-                    <KeyRound /> Reset contraseña
+                    <KeyRound /> Reset
                   </Button>
                   {user.id !== me?.id ? (
                     <Button
@@ -143,6 +154,24 @@ export default function Usuarios() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Edit dialog */}
+      <Dialog open={editUser !== null} onOpenChange={(open) => !open && setEditUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar usuario</DialogTitle>
+          </DialogHeader>
+          {editUser ? (
+            <UserForm
+              existing={editUser}
+              onSaved={() => {
+                setEditUser(null);
+                load();
+              }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={tempPassword !== null}
@@ -170,16 +199,21 @@ export default function Usuarios() {
   );
 }
 
-function NuevoUsuarioForm({
-  onCreated,
+function UserForm({
+  existing,
+  onSaved,
 }: {
-  onCreated: (user: UserWithTempPassword) => void;
+  existing?: User;
+  onSaved: (user: UserWithTempPassword | User) => void;
 }) {
-  const [username, setUsername] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [role, setRole] = useState<"worker" | "admin">("worker");
+  const isEdit = !!existing;
+  const [username, setUsername] = useState(existing?.username ?? "");
+  const [fullName, setFullName] = useState(existing?.full_name ?? "");
+  const [email, setEmail] = useState(existing?.email ?? "");
+  const [phone, setPhone] = useState(existing?.phone ?? "");
+  const [trade, setTrade] = useState(existing?.trade ?? "");
+  const [rate, setRate] = useState(existing?.hourly_rate ?? "");
+  const [role, setRole] = useState<"worker" | "admin">(existing?.role ?? "worker");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -187,17 +221,24 @@ function NuevoUsuarioForm({
     event.preventDefault();
     setError("");
     setBusy(true);
+    const payload = {
+      full_name: fullName,
+      email: email || null,
+      phone: phone || null,
+      trade: trade || null,
+      hourly_rate: rate === "" ? null : Number(rate),
+      role,
+    };
     try {
-      const created = await apiSend<UserWithTempPassword>("POST", "/api/v1/usuarios", {
-        username,
-        full_name: fullName,
-        email: email || null,
-        phone: phone || null,
-        role,
-      });
-      onCreated(created);
+      const saved = isEdit
+        ? await apiSend<User>("PATCH", `/api/v1/usuarios/${existing!.id}`, payload)
+        : await apiSend<UserWithTempPassword>("POST", "/api/v1/usuarios", {
+            username,
+            ...payload,
+          });
+      onSaved(saved);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo crear el usuario");
+      setError(err instanceof Error ? err.message : "No se pudo guardar el usuario");
       setBusy(false);
     }
   }
@@ -205,49 +246,71 @@ function NuevoUsuarioForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="new-fullname">Nombre completo *</Label>
+        <Label htmlFor="f-fullname">Nombre completo *</Label>
         <Input
-          id="new-fullname"
+          id="f-fullname"
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
           required
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="new-username">Usuario *</Label>
+        <Label htmlFor="f-username">Usuario *</Label>
         <Input
-          id="new-username"
+          id="f-username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           placeholder="ej. juan.perez"
           pattern="[a-zA-Z0-9._\-]{3,50}"
           title="Letras, números, puntos, guiones; sin espacios"
           required
+          disabled={isEdit}
         />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
-          <Label htmlFor="new-email">Email</Label>
+          <Label htmlFor="f-trade">Oficio</Label>
+          <Select id="f-trade" value={trade} onChange={(e) => setTrade(e.target.value)}>
+            <option value="">— Sin oficio —</option>
+            {TRADES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="f-rate">Tarifa (€/h)</Label>
           <Input
-            id="new-email"
+            id="f-rate"
+            type="number"
+            min={0}
+            step={0.01}
+            value={rate}
+            onChange={(e) => setRate(e.target.value)}
+            placeholder="ej. 18.50"
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-2">
+          <Label htmlFor="f-email">Email</Label>
+          <Input
+            id="f-email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="new-phone">Teléfono</Label>
-          <Input
-            id="new-phone"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-          />
+          <Label htmlFor="f-phone">Teléfono</Label>
+          <Input id="f-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
         </div>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="new-role">Rol</Label>
+        <Label htmlFor="f-role">Rol</Label>
         <Select
-          id="new-role"
+          id="f-role"
           value={role}
           onChange={(e) => setRole(e.target.value as "worker" | "admin")}
         >
@@ -257,7 +320,7 @@ function NuevoUsuarioForm({
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <Button type="submit" className="w-full" disabled={busy}>
-        {busy ? "Creando..." : "Crear usuario"}
+        {busy ? "Guardando..." : isEdit ? "Guardar cambios" : "Crear usuario"}
       </Button>
     </form>
   );

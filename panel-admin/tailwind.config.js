@@ -7,6 +7,22 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Nido Constructions brand
+        brand: {
+          50: "#fef6e0",
+          100: "#fdecc4",
+          300: "#fcd36b",
+          400: "#facb3f",
+          500: "#f9b414",
+          600: "#d99a0f",
+          700: "#a8770c",
+          900: "#6b4d09",
+        },
+        ink: {
+          700: "#3f454b",
+          800: "#32373c",
+          900: "#23272b",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

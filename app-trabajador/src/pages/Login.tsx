@@ -30,10 +30,15 @@ export default function Login() {
   return (
     <div className="flex min-h-screen flex-col justify-center bg-gray-100 p-6">
       <div className="mx-auto w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <div className="mb-2 text-5xl">🏗️</div>
-          <h1 className="text-2xl font-bold text-gray-900">Partes de Obra</h1>
-          <p className="text-gray-500">Acceso de trabajadores</p>
+        <div className="mb-8 flex flex-col items-center text-center">
+          <div className="mb-4 rounded-2xl bg-ink-800 px-6 py-5 shadow-sm">
+            <img
+              src="/brand/logo.png"
+              alt="Nido Constructions"
+              className="h-10 w-auto"
+            />
+          </div>
+          <p className="text-gray-500">Partes de obra · Acceso de trabajadores</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Field label="Usuario">

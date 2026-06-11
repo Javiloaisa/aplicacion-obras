@@ -14,6 +14,10 @@ dist/
 # Environment
 .env
 
+# Local preview/dev artifacts (SQLite + uploaded media)
+*.db
+backend/preview-media/
+
 # IDE / OS
 .vscode/
 .idea/

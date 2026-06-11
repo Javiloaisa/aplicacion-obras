@@ -8,7 +8,6 @@ import Login from "./pages/Login";
 import MisObras from "./pages/MisObras";
 import ObraHome from "./pages/ObraHome";
 import Parte from "./pages/Parte";
-import Subida from "./pages/Subida";
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -58,14 +57,6 @@ function AppRoutes() {
         element={
           <RequireAuth>
             <Parte />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/obras/:obraId/subir"
-        element={
-          <RequireAuth>
-            <Subida />
           </RequireAuth>
         }
       />

@@ -70,7 +70,7 @@ export default function Actividad() {
           <EmptyState>Todavía no has registrado partes en esta obra.</EmptyState>
         ) : (
           <>
-            <p className="mb-3 text-center text-lg font-semibold text-amber-600">
+            <p className="mb-3 text-center text-lg font-semibold text-brand-600">
               Total: {entries.total_hours} h
             </p>
             <div className="space-y-2">
@@ -80,7 +80,7 @@ export default function Actividad() {
                     <span className="font-semibold text-gray-900">
                       {formatDate(entry.work_date)}
                     </span>
-                    <span className="text-lg font-bold text-amber-600">
+                    <span className="text-lg font-bold text-brand-600">
                       {entry.hours} h
                     </span>
                   </div>

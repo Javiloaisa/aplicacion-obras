@@ -10,6 +10,9 @@ export interface QueuedEntry {
   kind: "entry";
   obraId: string;
   body: Record<string, unknown>;
+  // Client-side ref so media queued alongside this parte can be linked to it
+  // once the server assigns the real work entry id (see flushQueue).
+  clientRef?: string;
   createdAt: number;
 }
 
@@ -21,6 +24,10 @@ export interface QueuedMedia {
   filename: string;
   mimeType: string;
   caption: string | null;
+  // Link to a parte: either a known server id, or the clientRef of a queued
+  // entry that hasn't been sent yet (resolved during flushQueue).
+  workEntryId?: string | null;
+  workEntryRef?: string;
   createdAt: number;
 }
 
@@ -87,13 +94,26 @@ export async function flushQueue(): Promise<void> {
     const items = await db.getAll("queue");
     items.sort((a, b) => a.createdAt - b.createdAt);
 
+    // clientRef -> real work entry id, for media queued before its parte existed.
+    // Entries are always enqueued before their media, so by the time we reach
+    // the media its ref is already resolved (oldest-first order above).
+    const refMap = new Map<string, string>();
+
     for (const item of items) {
       try {
         if (item.kind === "entry") {
-          await apiSend("POST", `/api/v1/obras/${item.obraId}/entries`, item.body);
+          const created = await apiSend<{ id: string }>(
+            "POST",
+            `/api/v1/obras/${item.obraId}/entries`,
+            item.body,
+          );
+          if (item.clientRef && created?.id) refMap.set(item.clientRef, created.id);
         } else {
           const file = new File([item.blob], item.filename, { type: item.mimeType });
-          await uploadMediaFile(item.obraId, file, item.caption, () => {});
+          const workEntryId =
+            item.workEntryId ??
+            (item.workEntryRef ? refMap.get(item.workEntryRef) ?? null : null);
+          await uploadMediaFile(item.obraId, file, item.caption, () => {}, workEntryId);
         }
         await db.delete("queue", item.id!);
         await notifyChange();

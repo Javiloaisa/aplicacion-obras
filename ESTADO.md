@@ -4,7 +4,19 @@ Documento de traspaso de sesión. Léelo junto a `CLAUDE.md` y `ESPECIFICACION.m
 
 ## Resumen en una línea
 
-**Los 8 pasos del plan de trabajo de CLAUDE.md están completos y pusheados a GitHub** (`Javiloaisa/aplicacion-obras`, rama `master`, último commit `427da96`). Verificación de código completada (tests + builds + smoke runtime); falta la verificación end-to-end con `docker compose` real y la prueba de PWA en un móvil físico.
+**App base completa + identidad de marca Nido Constructions + funciones de venta (oficios/coste, PDF, ZIP, gráficas).** Repo `Javiloaisa/aplicacion-obras`, rama `master`. Verificación de código completa (89 tests, builds, smoke runtime); falta el e2e con `docker compose` real y la prueba de PWA en un móvil físico.
+
+## Novedades — versión de venta (11/06/2026)
+
+Sobre la base de los 8 pasos originales se añadió:
+
+1. **Foto dentro del parte**: en la app del trabajador, el parte de horas permite adjuntar fotos/vídeos (cámara o galería) **vinculados a ese parte** (`work_entry_id`); la cola offline mantiene el vínculo aunque se cree sin conexión (clientRef → id real al reenviar). Se **eliminó** el botón suelto "Subir fotos/vídeos" de `ObraHome` y la pantalla `Subida.tsx` (las fotos se suben solo desde el parte).
+2. **Identidad de marca Nido Constructions**: paleta `brand` (ámbar `#f9b414`) + `ink` (carbón `#32373c`) en ambos `tailwind.config.js`; cabecera/sidebar oscuros con el logo (`public/brand/logo.png`); iconos PWA y favicon regenerados desde la marca; nombres de app "Nido · Partes de obra" / "Nido · Panel de obras". El logo lleva texto blanco → solo se ve bien sobre fondo oscuro (de ahí las bandas carbón).
+3. **Oficios + coste de mano de obra**: `User.trade` y `User.hourly_rate` (migración Alembic `0002`). `hourly_rate` es admin-only (`AdminUserOut`, fuera del `UserOut` del login). Informes con coste por trabajador, **resumen por oficio** (`by_trade`) y `total_cost`; CSV con columnas oficio/tarifa/coste. Form de usuarios con oficio (select `TRADES`) y tarifa, + botón **Editar** (PATCH).
+4. **Informe PDF** (`reportlab`, sin libs de sistema): `GET /informes/horas/export.pdf` con cabecera de marca, totales, por-oficio y detalle. Logo en `backend/app/assets/logo.png`. Botón "Informe PDF" en Informes.
+5. **ZIP de media** (`GET /obras/{id}/media/export.zip`, admin, `ZIP_STORED`, temp file + cleanup): botón "Descargar ZIP" en la galería. **Gráficas** en el dashboard con `recharts` (horas por obra y por oficio de la semana) + tarjeta "coste semana".
+
+Pendiente sugerido para v2: aprobación de partes (workflow pendiente→aprobado), snapshot de tarifa en el parte (hoy el coste se calcula con la tarifa actual del trabajador), informe fotográfico en PDF.
 
 ## Verificación realizada (11/06/2026)
 
@@ -26,7 +38,7 @@ Pendiente de verificar todavía: e2e con `docker compose up -d --build` (los 3 s
 - Informes: `GET /informes/horas` (agregado obra×trabajador), `GET /informes/horas/export.csv` (delimitador `;` + BOM UTF-8 para Excel es-ES), `GET /informes/obra/{id}/resumen`.
 - Usuarios admin: alta con contraseña temporal (se devuelve una sola vez), PATCH para activar/desactivar/reset/rol, con guarda anti-bloqueo (un admin no puede desactivarse ni degradarse a sí mismo).
 - `GET /media/recent` (admin) para la mini-galería del dashboard.
-- **83 tests pasan** (`cd backend && .venv/Scripts/python -m pytest -q`).
+- **89 tests pasan** (`cd backend && .venv/Scripts/python -m pytest -q`) — incluye oficio/coste, PDF y ZIP.
 
 ### app-trabajador — COMPLETO (pasos 5-6)
 

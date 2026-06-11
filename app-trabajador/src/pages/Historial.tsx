@@ -90,7 +90,7 @@ export default function Historial() {
                     <span className="font-semibold text-gray-900">
                       {formatDate(entry.work_date)}
                     </span>
-                    <span className="text-lg font-bold text-amber-600">
+                    <span className="text-lg font-bold text-brand-600">
                       {entry.hours} h
                     </span>
                   </div>
