@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/table";
 import { apiGet, apiSend } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { formatEur } from "@/lib/format";
 import { TRADES, type User, type UserWithTempPassword } from "@/lib/types";
 
 export default function Usuarios() {
@@ -42,6 +41,14 @@ export default function Usuarios() {
         setError(err instanceof Error ? err.message : "Error al cargar usuarios"),
       );
   }, []);
+
+  // Default suggestions plus any trade already in use, so new ones are reusable
+  const tradeSuggestions = [
+    ...new Set([
+      ...TRADES,
+      ...(users ?? []).map((u) => u.trade).filter((t): t is string => !!t),
+    ]),
+  ];
 
   useEffect(load, [load]);
 
@@ -79,6 +86,7 @@ export default function Usuarios() {
               <DialogTitle>Nuevo usuario</DialogTitle>
             </DialogHeader>
             <UserForm
+              tradeSuggestions={tradeSuggestions}
               onSaved={(created) => {
                 setDialogOpen(false);
                 load();
@@ -103,7 +111,6 @@ export default function Usuarios() {
               <TableHead>Nombre</TableHead>
               <TableHead>Usuario</TableHead>
               <TableHead>Oficio</TableHead>
-              <TableHead className="text-right">Tarifa</TableHead>
               <TableHead>Rol</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
@@ -115,9 +122,6 @@ export default function Usuarios() {
                 <TableCell className="font-medium">{user.full_name}</TableCell>
                 <TableCell>@{user.username}</TableCell>
                 <TableCell>{user.trade || <span className="text-muted-foreground">—</span>}</TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {user.hourly_rate ? `${formatEur(user.hourly_rate)}/h` : <span className="text-muted-foreground">—</span>}
-                </TableCell>
                 <TableCell>
                   {user.role === "admin" ? (
                     <Badge>Admin</Badge>
@@ -164,6 +168,7 @@ export default function Usuarios() {
           {editUser ? (
             <UserForm
               existing={editUser}
+              tradeSuggestions={tradeSuggestions}
               onSaved={() => {
                 setEditUser(null);
                 load();
@@ -201,9 +206,11 @@ export default function Usuarios() {
 
 function UserForm({
   existing,
+  tradeSuggestions,
   onSaved,
 }: {
   existing?: User;
+  tradeSuggestions: string[];
   onSaved: (user: UserWithTempPassword | User) => void;
 }) {
   const isEdit = !!existing;
@@ -212,7 +219,6 @@ function UserForm({
   const [email, setEmail] = useState(existing?.email ?? "");
   const [phone, setPhone] = useState(existing?.phone ?? "");
   const [trade, setTrade] = useState(existing?.trade ?? "");
-  const [rate, setRate] = useState(existing?.hourly_rate ?? "");
   const [role, setRole] = useState<"worker" | "admin">(existing?.role ?? "worker");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -225,8 +231,7 @@ function UserForm({
       full_name: fullName,
       email: email || null,
       phone: phone || null,
-      trade: trade || null,
-      hourly_rate: rate === "" ? null : Number(rate),
+      trade: trade.trim() || null,
       role,
     };
     try {
@@ -267,30 +272,21 @@ function UserForm({
           disabled={isEdit}
         />
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-2">
-          <Label htmlFor="f-trade">Oficio</Label>
-          <Select id="f-trade" value={trade} onChange={(e) => setTrade(e.target.value)}>
-            <option value="">— Sin oficio —</option>
-            {TRADES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="f-rate">Tarifa (€/h)</Label>
-          <Input
-            id="f-rate"
-            type="number"
-            min={0}
-            step={0.01}
-            value={rate}
-            onChange={(e) => setRate(e.target.value)}
-            placeholder="ej. 18.50"
-          />
-        </div>
+      <div className="space-y-2">
+        <Label htmlFor="f-trade">Oficio</Label>
+        <Input
+          id="f-trade"
+          value={trade}
+          onChange={(e) => setTrade(e.target.value)}
+          list="trade-suggestions"
+          maxLength={50}
+          placeholder="Elige uno o escribe uno nuevo"
+        />
+        <datalist id="trade-suggestions">
+          {tradeSuggestions.map((t) => (
+            <option key={t} value={t} />
+          ))}
+        </datalist>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">

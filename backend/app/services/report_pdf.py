@@ -15,7 +15,6 @@ from reportlab.platypus import (
     LongTable,
     PageTemplate,
     Paragraph,
-    Spacer,
     Table,
     TableStyle,
 )
@@ -43,10 +42,6 @@ def _dec(value, suffix: str = "") -> str:
         return "—"
     s = f"{Decimal(value):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     return f"{s}{suffix}"
-
-
-def _eur(value) -> str:
-    return _dec(value, " €")
 
 
 def _hours(value) -> str:
@@ -103,7 +98,6 @@ def build_horas_pdf(
     frame = Frame(40, 44, w - 80, h - _BAND_H - 16 - 44, id="body")
     doc.addPageTemplates([PageTemplate(id="main", frames=[frame], onPage=_draw_chrome)])
 
-    has_cost = data.total_cost is not None
     story = []
 
     filt = [f"Periodo: {period}"]
@@ -115,9 +109,9 @@ def build_horas_pdf(
     story.append(Paragraph("  ·  ".join(filt), _sub))
 
     # KPI strip
-    kpis = [["Horas totales", "Partes", "Coste mano de obra"],
-            [_hours(data.total_hours), str(data.total_entries), _eur(data.total_cost)]]
-    kt = Table(kpis, colWidths=[(w - 80) / 3] * 3)
+    kpis = [["Horas totales", "Partes"],
+            [_hours(data.total_hours), str(data.total_entries)]]
+    kt = Table(kpis, colWidths=[(w - 80) / 2] * 2)
     kt.setStyle(TableStyle([
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica"),
         ("FONTSIZE", (0, 0), (-1, 0), 9),
@@ -136,37 +130,30 @@ def build_horas_pdf(
     # By trade
     if data.by_trade:
         story.append(Paragraph("Por oficio", _h2))
-        rows = [["Oficio", "Horas", "Coste"]]
+        rows = [["Oficio", "Horas"]]
         for t in data.by_trade:
-            rows.append([t.trade or "Sin oficio", _hours(t.total_hours), _eur(t.cost)])
-        tt = Table(rows, colWidths=[(w - 80) - 200, 100, 100])
+            rows.append([t.trade or "Sin oficio", _hours(t.total_hours)])
+        tt = Table(rows, colWidths=[(w - 80) - 100, 100])
         tt.setStyle(_table_style())
         story.append(tt)
 
     # Detail
     story.append(Paragraph("Detalle por obra y trabajador", _h2))
-    head = ["Obra", "Trabajador", "Oficio", "Partes", "Horas", "Coste"]
+    head = ["Obra", "Trabajador", "Oficio", "Partes", "Horas"]
     rows = [head]
     for r in data.rows:
         rows.append([
             r.obra_name, r.user_full_name, r.trade or "—",
-            str(r.entry_count), _hours(r.total_hours), _eur(r.cost),
+            str(r.entry_count), _hours(r.total_hours),
         ])
     if len(rows) == 1:
-        rows.append(["Sin datos para estos filtros", "", "", "", "", ""])
-    total_row = ["TOTAL", "", "", str(data.total_entries), _hours(data.total_hours), _eur(data.total_cost)]
+        rows.append(["Sin datos para estos filtros", "", "", "", ""])
+    total_row = ["TOTAL", "", "", str(data.total_entries), _hours(data.total_hours)]
     rows.append(total_row)
 
-    dt = LongTable(rows, colWidths=[140, 115, 80, 45, 55, 80], repeatRows=1)
+    dt = LongTable(rows, colWidths=[165, 140, 95, 50, 65], repeatRows=1)
     dt.setStyle(_table_style(total=True))
     story.append(dt)
-
-    if not has_cost:
-        story.append(Spacer(1, 8))
-        story.append(Paragraph(
-            "Coste vacío: asigna una tarifa €/h a los trabajadores para ver el coste de mano de obra.",
-            _sub,
-        ))
 
     doc.build(story)
     return buf.getvalue()
@@ -181,7 +168,7 @@ def _table_style(total: bool = False) -> TableStyle:
         ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
         ("FONTSIZE", (0, 1), (-1, -1), 9),
         ("TEXTCOLOR", (0, 1), (-1, -1), INK),
-        ("ALIGN", (-3, 0), (-1, -1), "RIGHT"),
+        ("ALIGN", (-2, 0), (-1, -1), "RIGHT"),
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, LIGHT]),
         ("LINEBELOW", (0, 0), (-1, -1), 0.5, LINE),
         ("TOPPADDING", (0, 0), (-1, -1), 5),

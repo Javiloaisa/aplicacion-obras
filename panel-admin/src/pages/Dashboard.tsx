@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import AuthImg from "@/components/AuthImg";
 import Layout from "@/components/Layout";
 import { apiGet } from "@/lib/api";
-import { formatEur, thisWeekRange, todayISO } from "@/lib/format";
+import { thisWeekRange, todayISO } from "@/lib/format";
 import type { HorasReport, MediaItem, Obra } from "@/lib/types";
 
 export default function Dashboard() {
@@ -62,13 +62,9 @@ export default function Dashboard() {
   return (
     <Layout title="Dashboard">
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <KpiCard label="Obras activas" value={obras?.length ?? "—"} />
         <KpiCard label="Horas esta semana" value={week ? `${week.total_hours} h` : "—"} />
-        <KpiCard
-          label="Coste semana"
-          value={week ? formatEur(week.total_cost) : "—"}
-        />
         <KpiCard label="Trabajadores activos hoy" value={today ? activeToday : "—"} />
       </div>
 

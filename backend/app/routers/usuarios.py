@@ -9,8 +9,8 @@ from sqlalchemy.orm import Session
 from app.deps import get_db, require_admin
 from app.models import User
 from app.schemas.user import (
-    AdminUserOut,
     UserCreate,
+    UserOut,
     UserUpdate,
     UserWithTempPassword,
 )
@@ -26,7 +26,7 @@ def _temp_password(length: int = 10) -> str:
     return "".join(secrets.choice(_PASSWORD_ALPHABET) for _ in range(length))
 
 
-@router.get("", response_model=list[AdminUserOut])
+@router.get("", response_model=list[UserOut])
 def list_usuarios(
     _admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
@@ -56,7 +56,6 @@ def create_usuario(
         email=body.email,
         phone=body.phone,
         trade=body.trade,
-        hourly_rate=body.hourly_rate,
         role=body.role,
         password_hash=hash_password(temp_password),
         must_change_password=True,

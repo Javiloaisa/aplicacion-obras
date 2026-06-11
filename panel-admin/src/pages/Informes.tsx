@@ -15,7 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { apiDownload, apiGet } from "@/lib/api";
-import { formatEur, thisMonthRange } from "@/lib/format";
+import { thisMonthRange } from "@/lib/format";
 import type { HorasReport, Obra, User } from "@/lib/types";
 
 export default function Informes() {
@@ -102,7 +102,7 @@ export default function Informes() {
       {error ? <p className="mb-4 text-sm text-destructive">{error}</p> : null}
 
       {/* Headline totals */}
-      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+      <div className="mb-4 grid gap-3 sm:grid-cols-2">
         <div className="rounded-xl border bg-card p-4">
           <p className="text-sm text-muted-foreground">Horas totales</p>
           <p className="text-2xl font-bold">{report?.total_hours ?? "0"} h</p>
@@ -110,10 +110,6 @@ export default function Informes() {
         <div className="rounded-xl border bg-card p-4">
           <p className="text-sm text-muted-foreground">Partes</p>
           <p className="text-2xl font-bold">{report?.total_entries ?? 0}</p>
-        </div>
-        <div className="rounded-xl border bg-card p-4">
-          <p className="text-sm text-muted-foreground">Coste mano de obra</p>
-          <p className="text-2xl font-bold">{formatEur(report?.total_cost)}</p>
         </div>
       </div>
 
@@ -126,7 +122,6 @@ export default function Informes() {
               <TableRow>
                 <TableHead>Oficio</TableHead>
                 <TableHead className="text-right">Horas</TableHead>
-                <TableHead className="text-right">Coste</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -134,7 +129,6 @@ export default function Informes() {
                 <TableRow key={t.trade ?? "—"}>
                   <TableCell>{t.trade || <span className="text-muted-foreground">Sin oficio</span>}</TableCell>
                   <TableCell className="text-right">{t.total_hours} h</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatEur(t.cost)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -151,7 +145,6 @@ export default function Informes() {
               <TableHead>Oficio</TableHead>
               <TableHead className="text-right">Partes</TableHead>
               <TableHead className="text-right">Horas</TableHead>
-              <TableHead className="text-right">Coste</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -162,12 +155,11 @@ export default function Informes() {
                 <TableCell>{row.trade || <span className="text-muted-foreground">—</span>}</TableCell>
                 <TableCell className="text-right">{row.entry_count}</TableCell>
                 <TableCell className="text-right font-semibold">{row.total_hours}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatEur(row.cost)}</TableCell>
               </TableRow>
             ))}
             {report && report.rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
                   No hay horas registradas con estos filtros.
                 </TableCell>
               </TableRow>
@@ -179,7 +171,6 @@ export default function Informes() {
                 <TableCell colSpan={3}>Total</TableCell>
                 <TableCell className="text-right">{report.total_entries}</TableCell>
                 <TableCell className="text-right">{report.total_hours} h</TableCell>
-                <TableCell className="text-right tabular-nums">{formatEur(report.total_cost)}</TableCell>
               </TableRow>
             </TableFooter>
           ) : null}

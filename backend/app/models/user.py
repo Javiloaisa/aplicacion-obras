@@ -1,8 +1,7 @@
 import uuid
 from datetime import datetime
-from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, Enum, Numeric, String, Uuid, func
+from sqlalchemy import Boolean, DateTime, Enum, String, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -16,10 +15,8 @@ class User(Base):
     full_name: Mapped[str] = mapped_column(String(120), nullable=False)
     email: Mapped[str | None] = mapped_column(String(255))
     phone: Mapped[str | None] = mapped_column(String(30))
-    # Trade/speciality (albañil, fontanero, electricista...) and labour rate.
-    # Rate is admin-only and feeds the labour-cost reports.
+    # Trade/speciality (albañil, fontanero, electricista...), free string
     trade: Mapped[str | None] = mapped_column(String(50))
-    hourly_rate: Mapped[Decimal | None] = mapped_column(Numeric(7, 2))
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(
         Enum("admin", "worker", name="user_role", native_enum=False),

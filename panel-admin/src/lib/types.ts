@@ -24,7 +24,6 @@ export interface User {
   email: string | null;
   phone: string | null;
   trade: string | null;
-  hourly_rate: string | null;
   role: Role;
   is_active: boolean;
   must_change_password: boolean;
@@ -116,14 +115,11 @@ export interface HorasRow {
   trade: string | null;
   total_hours: string;
   entry_count: number;
-  hourly_rate: string | null;
-  cost: string | null;
 }
 
 export interface TradeHoursRow {
   trade: string | null;
   total_hours: string;
-  cost: string | null;
 }
 
 export interface HorasReport {
@@ -131,7 +127,6 @@ export interface HorasReport {
   by_trade: TradeHoursRow[];
   total_hours: string;
   total_entries: number;
-  total_cost: string | null;
 }
 
 export interface WorkerHoursRow {
@@ -140,8 +135,6 @@ export interface WorkerHoursRow {
   trade: string | null;
   total_hours: string;
   entry_count: number;
-  hourly_rate: string | null;
-  cost: string | null;
 }
 
 export interface ObraResumen {
@@ -150,7 +143,6 @@ export interface ObraResumen {
   workers: WorkerHoursRow[];
   by_trade: TradeHoursRow[];
   total_hours: string;
-  total_cost: string | null;
   photo_count: number;
   video_count: number;
   first_entry_date: string | null;

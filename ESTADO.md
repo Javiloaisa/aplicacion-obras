@@ -12,11 +12,11 @@ Sobre la base de los 8 pasos originales se añadió:
 
 1. **Foto dentro del parte**: en la app del trabajador, el parte de horas permite adjuntar fotos/vídeos (cámara o galería) **vinculados a ese parte** (`work_entry_id`); la cola offline mantiene el vínculo aunque se cree sin conexión (clientRef → id real al reenviar). Se **eliminó** el botón suelto "Subir fotos/vídeos" de `ObraHome` y la pantalla `Subida.tsx` (las fotos se suben solo desde el parte).
 2. **Identidad de marca Nido Constructions**: paleta `brand` (ámbar `#f9b414`) + `ink` (carbón `#32373c`) en ambos `tailwind.config.js`; cabecera/sidebar oscuros con el logo (`public/brand/logo.png`); iconos PWA y favicon regenerados desde la marca; nombres de app "Nido · Partes de obra" / "Nido · Panel de obras". El logo lleva texto blanco → solo se ve bien sobre fondo oscuro (de ahí las bandas carbón).
-3. **Oficios + coste de mano de obra**: `User.trade` y `User.hourly_rate` (migración Alembic `0002`). `hourly_rate` es admin-only (`AdminUserOut`, fuera del `UserOut` del login). Informes con coste por trabajador, **resumen por oficio** (`by_trade`) y `total_cost`; CSV con columnas oficio/tarifa/coste. Form de usuarios con oficio (select `TRADES`) y tarifa, + botón **Editar** (PATCH).
+3. **Oficios**: `User.trade` (migración `0002`), texto libre con sugerencias (`TRADES` + oficios ya en uso, vía datalist) — se pueden crear oficios nuevos escribiéndolos. Informes con **resumen por oficio** (`by_trade`); CSV con columna oficio. Botón **Editar** usuario (PATCH). *Nota (11/06/2026): la tarifa €/h y todos los costes (`hourly_rate`, `total_cost`, tarjeta "coste semana", columnas de coste en CSV/PDF) se **eliminaron** a petición del cliente — migración `0003` borra la columna.*
 4. **Informe PDF** (`reportlab`, sin libs de sistema): `GET /informes/horas/export.pdf` con cabecera de marca, totales, por-oficio y detalle. Logo en `backend/app/assets/logo.png`. Botón "Informe PDF" en Informes.
-5. **ZIP de media** (`GET /obras/{id}/media/export.zip`, admin, `ZIP_STORED`, temp file + cleanup): botón "Descargar ZIP" en la galería. **Gráficas** en el dashboard con `recharts` (horas por obra y por oficio de la semana) + tarjeta "coste semana".
+5. **ZIP de media** (`GET /obras/{id}/media/export.zip`, admin, `ZIP_STORED`, temp file + cleanup): botón "Descargar ZIP" en la galería. **Gráficas** en el dashboard con `recharts` (horas por obra y por oficio de la semana).
 
-Pendiente sugerido para v2: aprobación de partes (workflow pendiente→aprobado), snapshot de tarifa en el parte (hoy el coste se calcula con la tarifa actual del trabajador), informe fotográfico en PDF.
+Pendiente sugerido para v2: aprobación de partes (workflow pendiente→aprobado), informe fotográfico en PDF.
 
 ## Verificación realizada (11/06/2026)
 
