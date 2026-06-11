@@ -1,10 +1,21 @@
-# ESTADO.md — Dónde nos quedamos (10/06/2026)
+# ESTADO.md — Dónde nos quedamos (11/06/2026)
 
 Documento de traspaso de sesión. Léelo junto a `CLAUDE.md` y `ESPECIFICACION.md` antes de continuar.
 
 ## Resumen en una línea
 
-**Los 8 pasos del plan de trabajo de CLAUDE.md están completos y pusheados a GitHub** (`Javiloaisa/aplicacion-obras`, rama `master`, último commit `427da96`). Falta la verificación end-to-end con `docker compose` y datos reales.
+**Los 8 pasos del plan de trabajo de CLAUDE.md están completos y pusheados a GitHub** (`Javiloaisa/aplicacion-obras`, rama `master`, último commit `427da96`). Verificación de código completada (tests + builds + smoke runtime); falta la verificación end-to-end con `docker compose` real y la prueba de PWA en un móvil físico.
+
+## Verificación realizada (11/06/2026)
+
+Tras clonar el repo en limpio en otra máquina (Windows, Python 3.11.9, Node 24; **sin Docker disponible**):
+
+- **Backend**: `pip install -r requirements.txt` OK; **83 tests pasan** (`.venv/Scripts/python -m pytest -q`, 7.2 s).
+- **Builds**: `app-trabajador` compila (tsc + vite, service worker PWA generado) y `panel-admin` compila (1848 módulos). Sin errores de TypeScript.
+- **Smoke runtime sobre HTTP**: se arrancó `uvicorn` contra un SQLite local (tablas vía `create_all`, los modelos usan el tipo genérico `Uuid`, compatible). 14/14 comprobaciones OK cubriendo criterios de aceptación 3, 5 y 6: seed del admin, login admin, crear obra, crear worker (devuelve contraseña temporal una vez), **worker rechazado en `admin_panel` (403)**, login worker en `worker_app`, worker sin asignar no ve obras, asignación → la obra aparece al instante, parte de 8 h, **parte de 20 h rechazado (límite 16 h, 422)**, informe de horas y export CSV (`text/csv`).
+- Artefactos del smoke test borrados (no se commitearon). Los `package-lock.json` mostraban churn cosmético de npm 11.8 (campos `libc`); revertido, árbol limpio.
+
+Pendiente de verificar todavía: e2e con `docker compose up -d --build` (los 3 subdominios vía Caddy, Postgres real, miniaturas con Pillow/ffmpeg en background) y la PWA en un móvil real.
 
 ## Estado por componente
 
@@ -45,7 +56,7 @@ Documento de traspaso de sesión. Léelo junto a `CLAUDE.md` y `ESPECIFICACION.m
 
 ## Qué falta / siguientes pasos sugeridos
 
-1. **Verificación end-to-end** (nadie la ha hecho aún): `docker compose up -d --build` o en dev (`docker compose up -d db` + uvicorn + los dos `npm run dev`), recorrer los 7 criterios de aceptación de ESPECIFICACION.md §10.
+1. **Verificación end-to-end con Docker** (parcialmente hecha — ver "Verificación realizada"): falta `docker compose up -d --build` para validar Postgres real, Caddy con los 3 subdominios y la generación de miniaturas (Pillow/ffmpeg) en background. El nivel de código (tests, builds, smoke HTTP con SQLite) ya está verde.
 2. Probar la PWA en un móvil real (instalación, cámara, modo avión para la cola offline).
 3. Revisar la galería con vídeos grandes; si molesta, cambiar el lightbox a streaming con token en query (requeriría soporte en la API).
 4. Despliegue real en el VPS siguiendo `DEPLOY.md`.
