@@ -58,11 +58,11 @@ def test_daily_cap_24h(client, worker_headers, obra):
     assert res.status_code == 400
 
 
-def test_worker_cannot_create_entry_in_unassigned_obra(
+def test_worker_creates_entry_in_any_active_obra(
     client, worker_headers, other_obra
 ):
     res = create_entry(client, other_obra.id, worker_headers)
-    assert res.status_code == 403
+    assert res.status_code == 201
 
 
 def test_worker_cannot_create_entry_for_another_user(
@@ -82,11 +82,6 @@ def test_worker_lists_only_own_entries(
     client, worker_headers, worker2_headers, admin_headers, obra, worker2
 ):
     create_entry(client, obra.id, worker_headers)
-    client.post(
-        f"/api/v1/obras/{obra.id}/assignments",
-        json={"add": [str(worker2.id)]},
-        headers=admin_headers,
-    )
     create_entry(client, obra.id, worker2_headers, hours=4)
 
     res = client.get(f"/api/v1/obras/{obra.id}/entries", headers=worker_headers)

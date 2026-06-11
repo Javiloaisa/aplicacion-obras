@@ -34,7 +34,7 @@ Pendiente de verificar todavía: e2e con `docker compose up -d --build` (los 3 s
 ### Backend — COMPLETO (pasos 2-4)
 
 - Modelos, migración inicial Alembic, auth JWT (access 30 min + refresh 30 días), seed de admin desde `.env`.
-- CRUD de obras + asignaciones, partes de horas (cálculo desde inicio/fin, límites 0.25-16 h/parte y 24 h/día, ventana de edición de 48 h para workers), media con validación de magic bytes y miniaturas en background.
+- CRUD de obras, partes de horas (cálculo desde inicio/fin, límites 0.25-16 h/parte y 24 h/día, ventana de edición de 48 h para workers), media con validación de magic bytes y miniaturas en background. *Nota (11/06/2026): las **asignaciones obra↔trabajador se eliminaron** a petición del cliente (migración `0004` borra `obra_assignments`): cualquier trabajador elige cualquier obra activa para fichar horas y subir fotos.*
 - Informes: `GET /informes/horas` (agregado obra×trabajador), `GET /informes/horas/export.csv` (delimitador `;` + BOM UTF-8 para Excel es-ES), `GET /informes/obra/{id}/resumen`.
 - Usuarios admin: alta con contraseña temporal (se devuelve una sola vez), PATCH para activar/desactivar/reset/rol, con guarda anti-bloqueo (un admin no puede desactivarse ni degradarse a sí mismo).
 - `GET /media/recent` (admin) para la mini-galería del dashboard.
@@ -50,7 +50,7 @@ Pendiente de verificar todavía: e2e con `docker compose up -d --build` (los 3 s
 ### panel-admin — COMPLETO (paso 7)
 
 - shadcn/ui instalado **manualmente** (sin CLI): componentes en `src/components/ui/` (button, input, label, card, table, dialog con Radix, badge, select nativo estilizado, textarea, tabs propias). Tema con variables CSS en `index.css`, alias `@/` en vite y tsconfig.
-- Páginas: Login (client `admin_panel`, la API rechaza workers), Dashboard (obras activas, horas de la semana por obra, trabajadores activos hoy, últimas subidas), Obras (tabla + buscador + crear/archivar), ObraDetalle con pestañas Galería/Horas/Trabajadores (la pestaña va en `?tab=` de la URL), Informes (filtros + CSV), Usuarios (alta con diálogo de contraseña temporal, reset, activar/desactivar).
+- Páginas: Login (client `admin_panel`, la API rechaza workers), Dashboard (obras activas, horas de la semana por obra, trabajadores activos hoy, últimas subidas), Obras (tabla + buscador + crear/archivar), ObraDetalle con pestañas Galería/Horas (la pestaña va en `?tab=` de la URL; la pestaña Trabajadores se eliminó junto con las asignaciones), Informes (filtros + CSV), Usuarios (alta con diálogo de contraseña temporal, reset, activar/desactivar).
 - El lightbox de la galería carga el original por fetch blob (también los vídeos; un vídeo de 200 MB se descarga entero antes de reproducir — limitación conocida aceptada para v1, el backend sí soporta Range).
 
 ### Infra/Docs — COMPLETO (pasos 1 y 8)

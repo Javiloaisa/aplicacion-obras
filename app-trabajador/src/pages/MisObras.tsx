@@ -35,12 +35,12 @@ export default function MisObras() {
 
   return (
     <Layout title={`Hola, ${user?.full_name?.split(" ")[0] ?? ""}`} showLogout>
-      <h2 className="mb-4 text-xl font-bold text-gray-900">Mis obras</h2>
+      <h2 className="mb-4 text-xl font-bold text-gray-900">Elige la obra</h2>
       <ErrorMessage>{error}</ErrorMessage>
       {!error && obras === null ? <Spinner /> : null}
       {obras !== null && obras.length === 0 ? (
         <EmptyState>
-          No tienes obras asignadas todavía. Habla con tu jefe.
+          No hay obras activas todavía. Habla con tu jefe.
         </EmptyState>
       ) : null}
       <div className="space-y-3">

@@ -19,7 +19,7 @@ import app.database as database
 from app.database import Base
 from app.deps import get_db
 from app.main import app
-from app.models import Obra, ObraAssignment, User
+from app.models import Obra, User
 from app.security import create_access_token, hash_password
 
 engine = create_engine(
@@ -115,18 +115,16 @@ def admin(db_session) -> User:
 
 @pytest.fixture
 def obra(db_session, worker) -> Obra:
-    """Active obra with `worker` assigned."""
+    """Active obra."""
     o = Obra(name="Reforma Calle Mayor 12", client_name="Cliente SL")
     db_session.add(o)
-    db_session.flush()
-    db_session.add(ObraAssignment(obra_id=o.id, user_id=worker.id))
     db_session.commit()
     return o
 
 
 @pytest.fixture
 def other_obra(db_session) -> Obra:
-    """Active obra with nobody assigned."""
+    """Another active obra."""
     o = Obra(name="Nave Industrial Polígono Sur")
     db_session.add(o)
     db_session.commit()

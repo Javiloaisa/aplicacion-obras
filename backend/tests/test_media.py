@@ -74,9 +74,9 @@ def test_upload_rejects_oversized_photo(client, worker_headers, obra):
     assert "15 MB" in res.json()["detail"]
 
 
-def test_upload_to_unassigned_obra_forbidden(client, worker_headers, other_obra):
+def test_upload_to_any_active_obra(client, worker_headers, other_obra):
     res = upload(client, other_obra.id, worker_headers)
-    assert res.status_code == 403
+    assert res.status_code == 201
 
 
 def test_multiple_files_in_one_request(client, worker_headers, obra):
@@ -118,11 +118,11 @@ def test_list_media_with_filters_and_pagination(
     assert data["pages"] == 2
 
 
-def test_worker_cannot_list_media_of_unassigned_obra(
+def test_worker_lists_media_of_any_active_obra(
     client, worker_headers, other_obra
 ):
     res = client.get(f"/api/v1/obras/{other_obra.id}/media", headers=worker_headers)
-    assert res.status_code == 403
+    assert res.status_code == 200
 
 
 def test_download_file_supports_range(client, worker_headers, obra):
@@ -142,12 +142,12 @@ def test_download_file_supports_range(client, worker_headers, obra):
     assert len(res.content) == 10
 
 
-def test_worker_cannot_download_media_of_unassigned_obra(
+def test_worker_downloads_media_of_any_active_obra(
     client, worker_headers, admin_headers, other_obra
 ):
     item = upload(client, other_obra.id, admin_headers).json()[0]
     res = client.get(f"/api/v1/media/{item['id']}/file", headers=worker_headers)
-    assert res.status_code == 403
+    assert res.status_code == 200
 
 
 def test_download_requires_auth(client, worker_headers, obra):
@@ -160,11 +160,6 @@ def test_author_edits_caption_other_worker_cannot(
     client, worker_headers, worker2_headers, admin_headers, obra, worker2
 ):
     item = upload(client, obra.id, worker_headers).json()[0]
-    client.post(
-        f"/api/v1/obras/{obra.id}/assignments",
-        json={"add": [str(worker2.id)]},
-        headers=admin_headers,
-    )
 
     res = client.patch(
         f"/api/v1/media/{item['id']}", json={"caption": "nueva"}, headers=worker_headers
@@ -213,11 +208,6 @@ def test_other_worker_cannot_delete(
     client, worker_headers, worker2_headers, admin_headers, obra, worker2
 ):
     item = upload(client, obra.id, worker_headers).json()[0]
-    client.post(
-        f"/api/v1/obras/{obra.id}/assignments",
-        json={"add": [str(worker2.id)]},
-        headers=admin_headers,
-    )
     res = client.delete(f"/api/v1/media/{item['id']}", headers=worker2_headers)
     assert res.status_code == 403
 

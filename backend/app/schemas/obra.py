@@ -38,8 +38,3 @@ class ObraDetailOut(ObraOut):
     photo_count: int
     video_count: int
     total_hours: Decimal
-
-
-class AssignmentsUpdate(BaseModel):
-    add: list[uuid.UUID] = []
-    remove: list[uuid.UUID] = []

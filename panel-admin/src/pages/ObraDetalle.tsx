@@ -3,14 +3,13 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import GaleriaTab from "@/components/obra/GaleriaTab";
 import HorasTab from "@/components/obra/HorasTab";
-import TrabajadoresTab from "@/components/obra/TrabajadoresTab";
 import Layout from "@/components/Layout";
 import { Badge } from "@/components/ui/badge";
 import { TabsBar } from "@/components/ui/tabs";
 import { apiGet } from "@/lib/api";
 import type { ObraDetail, User } from "@/lib/types";
 
-type Tab = "galeria" | "horas" | "trabajadores";
+type Tab = "galeria" | "horas";
 
 export default function ObraDetalle() {
   const { obraId } = useParams();
@@ -30,8 +29,9 @@ export default function ObraDetalle() {
 
   useEffect(() => {
     loadObra();
-    apiGet<User[]>(`/api/v1/obras/${obraId}/workers`)
-      .then(setWorkers)
+    // For the per-worker filters in the tabs (anyone can log hours anywhere)
+    apiGet<User[]>("/api/v1/usuarios")
+      .then((users) => setWorkers(users.filter((u) => u.is_active)))
       .catch(() => {});
   }, [obraId, loadObra]);
 
@@ -67,7 +67,6 @@ export default function ObraDetalle() {
           tabs={[
             { value: "galeria", label: "Galería" },
             { value: "horas", label: "Horas" },
-            { value: "trabajadores", label: `Trabajadores (${workers.length})` },
           ]}
         />
       </div>
@@ -76,9 +75,6 @@ export default function ObraDetalle() {
         <>
           {tab === "galeria" ? <GaleriaTab obraId={obraId} workers={workers} /> : null}
           {tab === "horas" ? <HorasTab obraId={obraId} workers={workers} /> : null}
-          {tab === "trabajadores" ? (
-            <TrabajadoresTab obraId={obraId} workers={workers} onChanged={setWorkers} />
-          ) : null}
         </>
       ) : null}
     </Layout>

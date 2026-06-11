@@ -6,7 +6,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
-from app.models import Obra, ObraAssignment, User
+from app.models import Obra, User
 from app.security import decode_token
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -67,12 +67,11 @@ def get_obra_or_404(db: Session, obra_id: uuid.UUID) -> Obra:
 
 
 def ensure_obra_access(db: Session, obra: Obra, user: User) -> None:
-    """Admins access any obra; workers only active obras they are assigned to."""
+    """Admins access any obra; workers any *active* obra (no assignments)."""
     if user.role == "admin":
         return
-    assignment = db.get(ObraAssignment, (obra.id, user.id))
-    if assignment is None or obra.status != "active":
+    if obra.status != "active":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="No estás asignado a esta obra",
+            detail="La obra no está activa",
         )
