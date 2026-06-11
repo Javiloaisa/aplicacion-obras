@@ -7,9 +7,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    # Loopback only: handy for local dev, never exposed to the outside
-    ports:
-      - "127.0.0.1:5432:5432"
+    # No host port: the VPS may run its own PostgreSQL on 5432.
+    # For a psql shell use: docker compose exec db psql -U $POSTGRES_USER $POSTGRES_DB
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -49,6 +48,11 @@ services:
       - "443:443"
     environment:
       DOMAIN: ${DOMAIN}
+      LEGACY_IP_HOST: ${LEGACY_IP_HOST:-legacy.invalid}
+    # Lets Caddy reach services running on the host (e.g. another
+    # app that used to own port 80, see LEGACY_IP_HOST in .env.example)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

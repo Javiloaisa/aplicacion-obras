@@ -176,3 +176,18 @@ Requiere un registro DNS `A` para `crypto.` y, en `docker-compose.yml`, dar a `c
 ```
 
 Así podrías incluso cerrar el `:8080` en el firewall y dejar el dashboard solo accesible por HTTPS. Es opcional: la convivencia funciona igual sin esto.
+
+### Si otro stack Docker ya ocupa los puertos 80/443 (caso real: estudio-pisada)
+
+Si el VPS ya tiene un Caddy/nginx en Docker sirviendo `http://IP` en el 80 (sin dominio propio), el Caddy de partes-de-obra pasa a ser el único en 80/443 y reenvía el tráfico por IP al otro stack:
+
+1. En el compose del otro proyecto, cambia los puertos de su proxy a loopback:
+   ```yaml
+   ports:
+     - "127.0.0.1:8081:80"   # antes "80:80" y "443:443"
+   ```
+   y recrea solo ese servicio: `docker compose up -d caddy`.
+2. En el `.env` de partes-de-obra define `LEGACY_IP_HOST=<IP-del-VPS>`.
+3. Arranca partes-de-obra. El bloque `http://{$LEGACY_IP_HOST}` del Caddyfile reenvía `http://IP` → `host.docker.internal:8081`, así la app antigua sigue respondiendo en su URL de siempre.
+
+Nota: la BD de este proyecto ya no publica el puerto 5432 en el host (en este VPS hay un PostgreSQL nativo escuchando ahí). Para una consola psql: `docker compose exec db psql -U partes partes_obra`.

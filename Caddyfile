@@ -20,3 +20,11 @@ api.{$DOMAIN} {
 	}
 	reverse_proxy api:8000
 }
+
+# Optional: keep a pre-existing app on the same VPS reachable at its old
+# plain-HTTP address (http://<server-ip>). Set LEGACY_IP_HOST to the server
+# IP and publish that app on host port 8081. When LEGACY_IP_HOST is unset
+# this block binds a placeholder host and never matches.
+http://{$LEGACY_IP_HOST} {
+	reverse_proxy host.docker.internal:8081
+}
