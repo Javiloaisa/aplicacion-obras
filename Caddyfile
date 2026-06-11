@@ -1,15 +1,34 @@
 # Three sites, one per subdomain. Automatic HTTPS via Let's Encrypt.
 
+# The frontends call the API with same-origin relative paths (/api/v1/...),
+# so each frontend host must route /api/* to the API service.
+
 app.{$DOMAIN} {
 	encode gzip
 	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
-	reverse_proxy app:80
+	request_body {
+		max_size 250MB
+	}
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+	handle {
+		reverse_proxy app:80
+	}
 }
 
 admin.{$DOMAIN} {
 	encode gzip
 	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
-	reverse_proxy admin:80
+	request_body {
+		max_size 250MB
+	}
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+	handle {
+		reverse_proxy admin:80
+	}
 }
 
 api.{$DOMAIN} {
