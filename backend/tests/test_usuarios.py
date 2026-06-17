@@ -127,3 +127,71 @@ def test_patch_unknown_user_404(client, admin_headers):
         headers=admin_headers,
     )
     assert res.status_code == 404
+
+
+def test_admin_sets_custom_password(client, admin_headers, worker):
+    res = client.patch(
+        f"/api/v1/usuarios/{worker.id}",
+        json={"new_password": "supersecreta123"},
+        headers=admin_headers,
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["temp_password"] is None
+    assert data["must_change_password"] is False
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "username": "worker1",
+            "password": "supersecreta123",
+            "client": "worker_app",
+        },
+    )
+    assert login.status_code == 200
+
+
+def test_new_password_too_short_rejected(client, admin_headers, worker):
+    res = client.patch(
+        f"/api/v1/usuarios/{worker.id}",
+        json={"new_password": "short"},
+        headers=admin_headers,
+    )
+    assert res.status_code == 422
+
+
+def test_delete_user_without_history(client, admin_headers):
+    created = client.post(
+        "/api/v1/usuarios",
+        json={"username": "borrame", "full_name": "Borrame"},
+        headers=admin_headers,
+    ).json()
+
+    res = client.delete(f"/api/v1/usuarios/{created['id']}", headers=admin_headers)
+    assert res.status_code == 204
+
+    listed = client.get("/api/v1/usuarios", headers=admin_headers).json()
+    assert all(u["username"] != "borrame" for u in listed)
+
+
+def test_delete_user_with_entries_blocked(client, admin_headers, worker_headers, obra):
+    client.post(
+        f"/api/v1/obras/{obra.id}/entries",
+        json={"work_date": "2026-06-09", "hours": 8},
+        headers=worker_headers,
+    )
+    worker_id = client.get("/api/v1/usuarios", headers=admin_headers).json()
+    worker_id = next(u["id"] for u in worker_id if u["username"] == "worker1")
+
+    res = client.delete(f"/api/v1/usuarios/{worker_id}", headers=admin_headers)
+    assert res.status_code == 409
+
+
+def test_delete_self_blocked(client, admin_headers, admin):
+    res = client.delete(f"/api/v1/usuarios/{admin.id}", headers=admin_headers)
+    assert res.status_code == 400
+
+
+def test_delete_requires_admin(client, worker_headers, worker):
+    res = client.delete(f"/api/v1/usuarios/{worker.id}", headers=worker_headers)
+    assert res.status_code == 403

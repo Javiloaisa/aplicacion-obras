@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { KeyRound, Pencil, Plus } from "lucide-react";
+import { KeyRound, Lock, Pencil, Plus, Trash2 } from "lucide-react";
 import Layout from "@/components/Layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ export default function Usuarios() {
   const [error, setError] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
+  const [passwordUser, setPasswordUser] = useState<User | null>(null);
   const [tempPassword, setTempPassword] = useState<{ name: string; password: string } | null>(null);
 
   const load = useCallback(() => {
@@ -68,6 +69,21 @@ export default function Usuarios() {
     );
     if (updated.temp_password) {
       setTempPassword({ name: user.full_name, password: updated.temp_password });
+    }
+  }
+
+  async function deleteUser(user: User) {
+    if (
+      !window.confirm(
+        `¿Eliminar definitivamente a ${user.full_name}? Esta acción no se puede deshacer.`,
+      )
+    )
+      return;
+    try {
+      await apiSend("DELETE", `/api/v1/usuarios/${user.id}`);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo eliminar el usuario");
     }
   }
 
@@ -140,17 +156,25 @@ export default function Usuarios() {
                   <Button variant="outline" size="sm" onClick={() => setEditUser(user)}>
                     <Pencil /> Editar
                   </Button>
+                  <Button variant="outline" size="sm" onClick={() => setPasswordUser(user)}>
+                    <Lock /> Contraseña
+                  </Button>
                   <Button variant="outline" size="sm" onClick={() => resetPassword(user)}>
                     <KeyRound /> Reset
                   </Button>
                   {user.id !== me?.id ? (
-                    <Button
-                      variant={user.is_active ? "destructive" : "default"}
-                      size="sm"
-                      onClick={() => toggleActive(user)}
-                    >
-                      {user.is_active ? "Desactivar" : "Activar"}
-                    </Button>
+                    <>
+                      <Button
+                        variant={user.is_active ? "destructive" : "default"}
+                        size="sm"
+                        onClick={() => toggleActive(user)}
+                      >
+                        {user.is_active ? "Desactivar" : "Activar"}
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => deleteUser(user)}>
+                        <Trash2 /> Eliminar
+                      </Button>
+                    </>
                   ) : null}
                 </TableCell>
               </TableRow>
@@ -173,6 +197,28 @@ export default function Usuarios() {
                 setEditUser(null);
                 load();
               }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* Custom password dialog */}
+      <Dialog
+        open={passwordUser !== null}
+        onOpenChange={(open) => !open && setPasswordUser(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cambiar contraseña</DialogTitle>
+            <DialogDescription>
+              Elige una nueva contraseña para {passwordUser?.full_name}. El usuario podrá
+              acceder con ella directamente, sin que se le pida cambiarla.
+            </DialogDescription>
+          </DialogHeader>
+          {passwordUser ? (
+            <ChangePasswordForm
+              user={passwordUser}
+              onSaved={() => setPasswordUser(null)}
             />
           ) : null}
         </DialogContent>
@@ -317,6 +363,55 @@ function UserForm({
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <Button type="submit" className="w-full" disabled={busy}>
         {busy ? "Guardando..." : isEdit ? "Guardar cambios" : "Crear usuario"}
+      </Button>
+    </form>
+  );
+}
+
+function ChangePasswordForm({
+  user,
+  onSaved,
+}: {
+  user: User;
+  onSaved: () => void;
+}) {
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    setBusy(true);
+    try {
+      await apiSend("PATCH", `/api/v1/usuarios/${user.id}`, {
+        new_password: password,
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo cambiar la contraseña");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="new-password">Nueva contraseña</Label>
+        <Input
+          id="new-password"
+          type="text"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          minLength={8}
+          maxLength={128}
+          placeholder="Mínimo 8 caracteres"
+          required
+        />
+      </div>
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      <Button type="submit" className="w-full" disabled={busy}>
+        {busy ? "Guardando..." : "Cambiar contraseña"}
       </Button>
     </form>
   );

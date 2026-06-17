@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.deps import get_db, require_admin
-from app.models import User
+from app.models import MediaFile, User, WorkEntry
 from app.schemas.user import (
     UserCreate,
     UserOut,
@@ -83,6 +83,7 @@ def update_usuario(
 
     data = body.model_dump(exclude_unset=True)
     reset_password = data.pop("reset_password", False)
+    new_password = data.pop("new_password", None)
 
     # Guard against locking yourself out of the panel
     if user.id == admin.id and (
@@ -97,7 +98,10 @@ def update_usuario(
         setattr(user, field, value)
 
     temp_password = None
-    if reset_password:
+    if new_password:
+        user.password_hash = hash_password(new_password)
+        user.must_change_password = False
+    elif reset_password:
         temp_password = _temp_password()
         user.password_hash = hash_password(temp_password)
         user.must_change_password = True
@@ -108,3 +112,38 @@ def update_usuario(
     out = UserWithTempPassword.model_validate(user)
     out.temp_password = temp_password
     return out
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_usuario(
+    user_id: uuid.UUID,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
+        )
+    if user.id == admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No puedes eliminar tu propia cuenta",
+        )
+
+    has_entries = (
+        db.scalar(select(WorkEntry.id).where(WorkEntry.user_id == user.id).limit(1))
+        is not None
+    )
+    has_media = (
+        db.scalar(select(MediaFile.id).where(MediaFile.user_id == user.id).limit(1))
+        is not None
+    )
+    if has_entries or has_media:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No se puede eliminar: tiene horas o material registrado. Desactívalo en su lugar.",
+        )
+
+    db.delete(user)
+    db.commit()

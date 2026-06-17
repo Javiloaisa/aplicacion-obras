@@ -54,6 +54,8 @@ class UserUpdate(BaseModel):
     is_active: bool | None = None
     # When true, a new temporary password is generated and returned once
     reset_password: bool = False
+    # Admin-chosen password; takes priority over reset_password if both are sent
+    new_password: str | None = Field(None, min_length=8, max_length=128)
 
 
 class UserWithTempPassword(UserOut):

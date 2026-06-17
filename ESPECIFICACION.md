@@ -105,7 +105,8 @@ Sistema compuesto por **dos aplicaciones independientes** sobre una **API común
 - `GET /informes/obra/{id}/resumen` — totales de la obra: horas por trabajador, nº fotos/vídeos, primer y último parte
 
 ### Usuarios (admin)
-- `GET /usuarios`, `POST /usuarios` (devuelve contraseña temporal una sola vez), `PATCH /usuarios/{id}` (activar/desactivar, reset contraseña, cambiar rol)
+- `GET /usuarios`, `POST /usuarios` (devuelve contraseña temporal una sola vez), `PATCH /usuarios/{id}` (activar/desactivar, reset contraseña, fijar `new_password` propia, cambiar rol)
+- `DELETE /usuarios/{id}` — borrado físico; rechaza si el usuario tiene partes de horas o media asociados (desactivar en su lugar) o si es la propia cuenta del admin
 
 ### Otros
 - `GET /health`
