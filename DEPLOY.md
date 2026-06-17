@@ -181,12 +181,21 @@ Así podrías incluso cerrar el `:8080` en el firewall y dejar el dashboard solo
 
 Si el VPS ya tiene un Caddy/nginx en Docker sirviendo `http://IP` en el 80 (sin dominio propio), el Caddy de partes-de-obra pasa a ser el único en 80/443 y reenvía el tráfico por IP al otro stack:
 
-1. En el compose del otro proyecto, cambia los puertos de su proxy a loopback:
+1. En el compose del otro proyecto, ata su proxy a la **IP del bridge de Docker**
+   (la que `host.docker.internal` resuelve dentro del Caddy de partes-de-obra,
+   normalmente `172.17.0.1`), no a `127.0.0.1`:
    ```yaml
    ports:
-     - "127.0.0.1:8081:80"   # antes "80:80" y "443:443"
+     - "172.17.0.1:8081:80"   # antes "80:80" y "443:443"
    ```
    y recrea solo ese servicio: `docker compose up -d caddy`.
+
+   > ⚠️ **No uses `127.0.0.1:8081:80`**: el Caddy de partes-de-obra alcanza al otro
+   > stack vía `host.docker.internal`, que apunta a la puerta de enlace del bridge
+   > (p. ej. `172.17.0.1`), **no** a `127.0.0.1`. Si lo atas solo al loopback,
+   > `http://IP` devolverá **502**. Comprueba la IP correcta con:
+   > `docker exec partes-de-obra-caddy-1 getent hosts host.docker.internal`.
+   > Atarlo a `172.17.0.1` lo mantiene accesible solo desde Docker (no se expone a internet).
 2. En el `.env` de partes-de-obra define `LEGACY_IP_HOST=<IP-del-VPS>`.
 3. Arranca partes-de-obra. El bloque `http://{$LEGACY_IP_HOST}` del Caddyfile reenvía `http://IP` → `host.docker.internal:8081`, así la app antigua sigue respondiendo en su URL de siempre.
 
