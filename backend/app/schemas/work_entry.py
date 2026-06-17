@@ -16,6 +16,7 @@ class WorkEntryCreate(BaseModel):
 
 
 class WorkEntryUpdate(BaseModel):
+    obra_id: uuid.UUID | None = None
     work_date: date | None = None
     start_time: time | None = None
     end_time: time | None = None

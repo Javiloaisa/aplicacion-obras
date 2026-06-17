@@ -23,7 +23,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { apiDownload, apiGet, apiSend } from "@/lib/api";
 import { formatDate } from "@/lib/format";
-import type { EntriesList, User, WorkEntry } from "@/lib/types";
+import type { EntriesList, Obra, User, WorkEntry } from "@/lib/types";
 
 export default function HorasTab({
   obraId,
@@ -220,11 +220,17 @@ export default function HorasTab({
 }
 
 function EditEntryForm({ entry, onSaved }: { entry: WorkEntry; onSaved: () => void }) {
+  const [obraId, setObraId] = useState(entry.obra_id);
+  const [obras, setObras] = useState<Obra[]>([]);
   const [workDate, setWorkDate] = useState(entry.work_date);
   const [hours, setHours] = useState(entry.hours);
   const [notes, setNotes] = useState(entry.notes ?? "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    apiGet<Obra[]>("/api/v1/obras").then(setObras).catch(() => {});
+  }, []);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -232,6 +238,7 @@ function EditEntryForm({ entry, onSaved }: { entry: WorkEntry; onSaved: () => vo
     setBusy(true);
     try {
       await apiSend("PATCH", `/api/v1/entries/${entry.id}`, {
+        obra_id: obraId,
         work_date: workDate,
         hours: Number(hours),
         notes: notes || null,
@@ -246,6 +253,14 @@ function EditEntryForm({ entry, onSaved }: { entry: WorkEntry; onSaved: () => vo
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <p className="text-sm text-muted-foreground">{entry.user_full_name}</p>
+      <div className="space-y-2">
+        <Label htmlFor="edit-obra">Obra</Label>
+        <Select id="edit-obra" value={obraId} onChange={(e) => setObraId(e.target.value)} required>
+          {obras.map((o) => (
+            <option key={o.id} value={o.id}>{o.name}</option>
+          ))}
+        </Select>
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
           <Label htmlFor="edit-date">Fecha</Label>

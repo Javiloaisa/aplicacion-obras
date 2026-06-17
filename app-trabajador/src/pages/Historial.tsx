@@ -98,6 +98,17 @@ export default function Historial() {
                   {entry.notes ? (
                     <div className="mt-1 text-base text-gray-600">{entry.notes}</div>
                   ) : null}
+                  <div className="mt-2">
+                    {entry.validated ? (
+                      <span className="inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">
+                        ✓ Validado por el jefe
+                      </span>
+                    ) : (
+                      <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500">
+                        Pendiente de validar
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

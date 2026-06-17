@@ -50,6 +50,7 @@ export interface WorkEntry {
   created_at: string;
   updated_at: string;
   edited_by_admin: boolean;
+  validated: boolean;
   user_full_name: string | null;
   obra_name: string | null;
 }

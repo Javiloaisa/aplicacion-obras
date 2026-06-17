@@ -182,6 +182,39 @@ def test_edit_recomputes_hours_from_times(client, worker_headers, obra):
     assert float(res.json()["hours"]) == 8.0
 
 
+def test_admin_moves_entry_to_another_obra(
+    client, worker_headers, admin_headers, obra, other_obra
+):
+    entry = create_entry(client, obra.id, worker_headers).json()
+    res = client.patch(
+        f"/api/v1/entries/{entry['id']}",
+        json={"obra_id": str(other_obra.id)},
+        headers=admin_headers,
+    )
+    assert res.status_code == 200
+    assert res.json()["obra_id"] == str(other_obra.id)
+
+
+def test_worker_cannot_change_obra(client, worker_headers, obra, other_obra):
+    entry = create_entry(client, obra.id, worker_headers).json()
+    res = client.patch(
+        f"/api/v1/entries/{entry['id']}",
+        json={"obra_id": str(other_obra.id)},
+        headers=worker_headers,
+    )
+    assert res.status_code == 403
+
+
+def test_change_obra_to_unknown_404(client, admin_headers, worker_headers, obra):
+    entry = create_entry(client, obra.id, worker_headers).json()
+    res = client.patch(
+        f"/api/v1/entries/{entry['id']}",
+        json={"obra_id": "00000000-0000-0000-0000-000000000000"},
+        headers=admin_headers,
+    )
+    assert res.status_code == 404
+
+
 def test_admin_validates_entry(client, worker_headers, admin_headers, obra):
     entry = create_entry(client, obra.id, worker_headers).json()
     assert entry["validated"] is False

@@ -1,12 +1,9 @@
 import type { ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./lib/auth-context";
-import Actividad from "./pages/Actividad";
 import CambiarPassword from "./pages/CambiarPassword";
 import Historial from "./pages/Historial";
 import Login from "./pages/Login";
-import MisObras from "./pages/MisObras";
-import ObraHome from "./pages/ObraHome";
 import Parte from "./pages/Parte";
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -32,7 +29,7 @@ function AppRoutes() {
         path="/"
         element={
           <RequireAuth>
-            <MisObras />
+            <Parte />
           </RequireAuth>
         }
       />
@@ -41,30 +38,6 @@ function AppRoutes() {
         element={
           <RequireAuth>
             <Historial />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/obras/:obraId"
-        element={
-          <RequireAuth>
-            <ObraHome />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/obras/:obraId/parte"
-        element={
-          <RequireAuth>
-            <Parte />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/obras/:obraId/actividad"
-        element={
-          <RequireAuth>
-            <Actividad />
           </RequireAuth>
         }
       />

@@ -87,7 +87,7 @@ Sistema compuesto por **dos aplicaciones independientes** sobre una **API común
 - `POST /obras/{id}/entries` — worker en sus obras; admin en cualquiera y para cualquier user
 - `GET /obras/{id}/entries` — admin: todos, filtros `user_id`, `from`, `to`; worker: solo los suyos
 - `GET /entries/mine?from=&to=` — historial del trabajador (con totales)
-- `PATCH /entries/{id}` — worker: solo los suyos y dentro de las 48 h tras crearlos; admin: cualquiera (marca `edited_by_admin`)
+- `PATCH /entries/{id}` — worker: solo los suyos y dentro de las 48 h tras crearlos; admin: cualquiera (marca `edited_by_admin`); cambiar `obra_id` solo lo puede hacer el admin
 - `DELETE /entries/{id}` — mismas reglas que PATCH
 - `PATCH /entries/{id}/validate` (admin) — body `{validated: bool}`; marca/desmarca el parte como validado
 
@@ -117,12 +117,8 @@ Sistema compuesto por **dos aplicaciones independientes** sobre una **API común
 
 ### Pantallas
 1. **Login** (+ cambio de contraseña obligatorio la primera vez). Sesión persistente: no pedir login cada día.
-2. **Mis obras**: tarjetas grandes con las obras activas asignadas. Si solo tiene una, entrar directamente.
-3. **Obra** — 3 botones grandes:
-   - **➕ Parte de horas**: fecha (hoy por defecto), modo A: hora inicio + hora fin (calcula horas), modo B: campo numérico de horas directo. Notas opcionales. Guardar.
-   - **📷 Subir fotos/vídeos**: `<input type="file" accept="image/*,video/*" capture="environment" multiple>` para abrir cámara o galería; previsualización, caption opcional, barra de progreso por archivo, compresión de fotos en cliente antes de subir (canvas, máx ~2560 px lado largo) para ahorrar datos.
-   - **🕓 Mi actividad**: sus partes y media en esta obra.
-4. **Historial**: horas de la semana y del mes con total destacado.
+2. **Parte de horas (pantalla principal)**: desplegable para elegir la obra (si solo tiene una activa, se preselecciona), fecha (hoy por defecto), modo A: hora inicio + hora fin (calcula horas), modo B: campo numérico de horas directo, notas opcionales, fotos/vídeos del trabajo (`<input type="file" accept="image/*,video/*" capture="environment" multiple>`, previsualización, compresión en cliente antes de subir). Debajo del botón "Guardar parte", un botón lleva al Historial.
+3. **Historial**: horas de la semana y del mes con total destacado; cada parte muestra su fecha, obra y si el administrador ya lo ha validado.
 
 ### Requisitos PWA
 - `manifest.json` (nombre, iconos 192/512, `display: standalone`), instalable en Android e iOS.
@@ -140,10 +136,10 @@ Aplicación web clásica (NO PWA), optimizada para escritorio, responsive para p
 3. **Obras**: tabla con buscador y filtro activas/archivadas; crear obra; archivar; acceso al detalle.
 4. **Detalle de obra** con pestañas:
    - **Galería**: grid de miniaturas, filtros por trabajador/fecha/tipo, lightbox con reproductor de vídeo, descargar original, eliminar, ver caption y autor/fecha.
-   - **Horas**: tabla de partes con filtros por trabajador y rango de fechas, totales por trabajador, editar/eliminar partes, botón "Exportar CSV".
+   - **Horas**: tabla de partes con filtros por trabajador y rango de fechas, totales por trabajador, editar (incluida la obra, por si el trabajador se equivocó al elegirla)/eliminar partes, validar/invalidar, botón "Exportar CSV".
    - **Trabajadores**: asignar/desasignar (multi-select con búsqueda).
-5. **Informes**: rango de fechas + filtros obra/trabajador, tabla agregada obra×trabajador con totales, exportar CSV.
-6. **Usuarios**: alta de trabajador (muestra contraseña temporal una sola vez), activar/desactivar, reset de contraseña.
+5. **Informes**: rango de fechas + filtros obra/trabajador, listado de partes individuales con fecha y estado de validación, totales y desglose por oficio, exportar CSV/PDF.
+6. **Usuarios**: alta de trabajador (muestra contraseña temporal una sola vez), activar/desactivar, reset de contraseña aleatoria o fijar una contraseña propia, eliminar (bloqueado si tiene horas o media registrados).
 
 ## 7. Seguridad
 

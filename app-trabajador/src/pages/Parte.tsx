@@ -1,11 +1,11 @@
-import { useRef, useState, type FormEvent } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
-import { Button, ErrorMessage, Field, Input, Textarea } from "../components/ui";
-import { apiSend } from "../lib/api";
+import { Button, EmptyState, ErrorMessage, Field, Input, Select, Spinner, Textarea } from "../components/ui";
+import { apiGet, apiSend, SessionExpiredError } from "../lib/api";
 import { enqueue, isRetryable } from "../lib/offline-queue";
 import { compressPhoto, uploadMediaFile } from "../lib/upload";
-import type { WorkEntry } from "../lib/types";
+import type { Obra, WorkEntry } from "../lib/types";
 
 function todayISO(): string {
   return new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
@@ -28,9 +28,11 @@ interface Photo {
 }
 
 export default function Parte() {
-  const { obraId } = useParams();
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [obras, setObras] = useState<Obra[] | null>(null);
+  const [obrasError, setObrasError] = useState("");
+  const [obraId, setObraId] = useState("");
   const [mode, setMode] = useState<"times" | "manual">("times");
   const [workDate, setWorkDate] = useState(todayISO());
   const [startTime, setStartTime] = useState("");
@@ -44,6 +46,21 @@ export default function Parte() {
   const [result, setResult] = useState<"sent" | "queued" | "partial" | null>(null);
   // Kept so failed photo uploads can be retried without re-creating the parte
   const [savedEntryId, setSavedEntryId] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiGet<Obra[]>("/api/v1/obras")
+      .then((data) => {
+        setObras(data);
+        if (data.length === 1) setObraId(data[0].id);
+      })
+      .catch((err) => {
+        if (err instanceof SessionExpiredError) {
+          navigate("/login", { replace: true });
+        } else {
+          setObrasError(err instanceof Error ? err.message : "Error al cargar las obras");
+        }
+      });
+  }, [navigate]);
 
   const preview = mode === "times" ? computedHours(startTime, endTime) : null;
 
@@ -71,6 +88,18 @@ export default function Parte() {
     });
   }
 
+  function resetForm() {
+    setWorkDate(todayISO());
+    setMode("times");
+    setStartTime("");
+    setEndTime("");
+    setHours("");
+    setNotes("");
+    setPhotos([]);
+    setSavedEntryId(null);
+    setResult(null);
+  }
+
   /**
    * Upload the given photos linked to a work entry. Returns counters so the
    * caller can decide the final state. A connection loss mid-upload sends the
@@ -88,14 +117,14 @@ export default function Parte() {
       const original = photos[i];
       try {
         const file = original.isVideo ? original.file : await compressPhoto(original.file);
-        await uploadMediaFile(obraId!, file, null, (pct) => updatePhoto(i, { progress: pct }), entryId);
+        await uploadMediaFile(obraId, file, null, (pct) => updatePhoto(i, { progress: pct }), entryId);
         updatePhoto(i, { status: "done", progress: 100 });
       } catch (err) {
         if (isRetryable(err)) {
           const file = original.isVideo ? original.file : await compressPhoto(original.file);
           await enqueue({
             kind: "media",
-            obraId: obraId!,
+            obraId,
             blob: file,
             filename: file.name,
             mimeType: file.type,
@@ -116,7 +145,10 @@ export default function Parte() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!obraId) return;
+    if (!obraId) {
+      setError("Selecciona la obra");
+      return;
+    }
     setError("");
     setBusy(true);
     const body =
@@ -152,7 +184,7 @@ export default function Parte() {
           updatePhoto(i, { status: "queued" });
         }
         setResult("queued");
-        setTimeout(() => navigate(`/obras/${obraId}`, { replace: true }), 1400);
+        setTimeout(resetForm, 1400);
         return;
       }
       setError(err instanceof Error ? err.message : "No se pudo guardar el parte");
@@ -163,7 +195,7 @@ export default function Parte() {
     // 2) Parte created: upload attached photos linked to it.
     if (photos.length === 0) {
       setResult("sent");
-      setTimeout(() => navigate(`/obras/${obraId}`, { replace: true }), 900);
+      setTimeout(resetForm, 900);
       return;
     }
 
@@ -178,7 +210,7 @@ export default function Parte() {
       return;
     }
     setResult(queued > 0 ? "queued" : "sent");
-    setTimeout(() => navigate(`/obras/${obraId}`, { replace: true }), 900);
+    setTimeout(resetForm, 900);
   }
 
   async function retryFailed() {
@@ -188,7 +220,7 @@ export default function Parte() {
     const { failed } = await uploadPhotos(savedEntryId, indices);
     if (failed === 0) {
       setResult("sent");
-      setTimeout(() => navigate(`/obras/${obraId}`, { replace: true }), 900);
+      setTimeout(resetForm, 900);
     } else {
       setBusy(false);
     }
@@ -196,7 +228,7 @@ export default function Parte() {
 
   if (result === "sent" || result === "queued") {
     return (
-      <Layout title="Parte de horas" back={`/obras/${obraId}`}>
+      <Layout title="Parte de horas" showLogout>
         <div className="py-16 text-center">
           <div className="mb-3 text-6xl">{result === "sent" ? "✅" : "⏳"}</div>
           <p className="text-xl font-semibold text-gray-900">
@@ -212,7 +244,7 @@ export default function Parte() {
   // result === "partial": parte saved but some files could not be uploaded
   if (result === "partial") {
     return (
-      <Layout title="Parte de horas" back={`/obras/${obraId}`}>
+      <Layout title="Parte de horas" showLogout>
         <div className="space-y-4 py-6">
           <div className="text-center">
             <div className="mb-2 text-5xl">⚠️</div>
@@ -225,12 +257,7 @@ export default function Parte() {
           <Button type="button" onClick={retryFailed} disabled={busy}>
             {busy ? "Reintentando..." : "Reintentar archivos"}
           </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => navigate(`/obras/${obraId}`, { replace: true })}
-            disabled={busy}
-          >
+          <Button type="button" variant="secondary" onClick={resetForm} disabled={busy}>
             Continuar sin esos archivos
           </Button>
         </div>
@@ -239,126 +266,156 @@ export default function Parte() {
   }
 
   return (
-    <Layout title="Parte de horas" back={`/obras/${obraId}`}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Field label="Fecha">
-          <Input
-            type="date"
-            value={workDate}
-            max={todayISO()}
-            onChange={(e) => setWorkDate(e.target.value)}
-            required
-          />
-        </Field>
+    <Layout title="Parte de horas" showLogout>
+      <ErrorMessage>{obrasError}</ErrorMessage>
+      {!obrasError && obras === null ? <Spinner /> : null}
+      {obras !== null && obras.length === 0 ? (
+        <EmptyState>No hay obras activas todavía. Habla con tu jefe.</EmptyState>
+      ) : null}
 
-        <div className="grid grid-cols-2 gap-2 rounded-xl bg-gray-200 p-1">
-          {(
-            [
-              ["times", "Inicio y fin"],
-              ["manual", "Horas directas"],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setMode(value)}
-              className={`min-h-12 rounded-lg text-base font-semibold ${
-                mode === value ? "bg-white text-gray-900 shadow" : "text-gray-600"
-              }`}
+      {obras !== null && obras.length > 0 ? (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Field label="Obra">
+            <Select
+              value={obraId}
+              onChange={(e) => setObraId(e.target.value)}
+              required
             >
-              {label}
-            </button>
-          ))}
-        </div>
+              <option value="" disabled>
+                Selecciona la obra
+              </option>
+              {obras.map((obra) => (
+                <option key={obra.id} value={obra.id}>{obra.name}</option>
+              ))}
+            </Select>
+          </Field>
 
-        {mode === "times" ? (
-          <>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Hora inicio">
-                <Input
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  required
-                />
-              </Field>
-              <Field label="Hora fin">
-                <Input
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  required
-                />
-              </Field>
-            </div>
-            {preview !== null ? (
-              <p className="text-center text-lg font-semibold text-brand-600">
-                {preview} horas
-              </p>
-            ) : null}
-          </>
-        ) : (
-          <Field label="Horas trabajadas">
+          <Field label="Fecha">
             <Input
-              type="number"
-              inputMode="decimal"
-              min={0.25}
-              max={16}
-              step={0.25}
-              value={hours}
-              onChange={(e) => setHours(e.target.value)}
-              placeholder="8"
+              type="date"
+              value={workDate}
+              max={todayISO()}
+              onChange={(e) => setWorkDate(e.target.value)}
               required
             />
           </Field>
-        )}
 
-        <Field label="Notas (opcional)">
-          <Textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={3}
-            maxLength={1000}
-            placeholder="Ej.: alicatado baño planta 1"
-          />
-        </Field>
+          <div className="grid grid-cols-2 gap-2 rounded-xl bg-gray-200 p-1">
+            {(
+              [
+                ["times", "Inicio y fin"],
+                ["manual", "Horas directas"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setMode(value)}
+                className={`min-h-12 rounded-lg text-base font-semibold ${
+                  mode === value ? "bg-white text-gray-900 shadow" : "text-gray-600"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
-        {/* Photos/videos of this specific job, attached to the parte */}
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-gray-700">
-            Fotos/vídeos del trabajo (opcional)
-          </p>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*,video/*"
-            capture="environment"
-            multiple
-            className="hidden"
-            onChange={(e) => pickFiles(e.target.files)}
-          />
+          {mode === "times" ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Hora inicio">
+                  <Input
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    required
+                  />
+                </Field>
+                <Field label="Hora fin">
+                  <Input
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    required
+                  />
+                </Field>
+              </div>
+              {preview !== null ? (
+                <p className="text-center text-lg font-semibold text-brand-600">
+                  {preview} horas
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <Field label="Horas trabajadas">
+              <Input
+                type="number"
+                inputMode="decimal"
+                min={0.25}
+                max={16}
+                step={0.25}
+                value={hours}
+                onChange={(e) => setHours(e.target.value)}
+                placeholder="8"
+                required
+              />
+            </Field>
+          )}
+
+          <Field label="Notas (opcional)">
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              maxLength={1000}
+              placeholder="Ej.: alicatado baño planta 1"
+            />
+          </Field>
+
+          {/* Photos/videos of this specific job, attached to the parte */}
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-gray-700">
+              Fotos/vídeos del trabajo (opcional)
+            </p>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*,video/*"
+              capture="environment"
+              multiple
+              className="hidden"
+              onChange={(e) => pickFiles(e.target.files)}
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => fileRef.current?.click()}
+              disabled={busy}
+            >
+              📷 {photos.length === 0 ? "Añadir fotos o vídeos" : "Añadir más"}
+            </Button>
+            {photos.length > 0 ? (
+              <PhotoGrid photos={photos} onRemove={busy ? undefined : removePhoto} />
+            ) : null}
+          </div>
+
+          <ErrorMessage>{error}</ErrorMessage>
+          <Button type="submit" disabled={busy}>
+            {busy
+              ? photos.length > 0
+                ? "Guardando y subiendo..."
+                : "Guardando..."
+              : "Guardar parte"}
+          </Button>
           <Button
             type="button"
             variant="secondary"
-            onClick={() => fileRef.current?.click()}
-            disabled={busy}
+            onClick={() => navigate("/historial")}
           >
-            📷 {photos.length === 0 ? "Añadir fotos o vídeos" : "Añadir más"}
+            🕓 Ver mis horas y si están validadas
           </Button>
-          {photos.length > 0 ? (
-            <PhotoGrid photos={photos} onRemove={busy ? undefined : removePhoto} />
-          ) : null}
-        </div>
-
-        <ErrorMessage>{error}</ErrorMessage>
-        <Button type="submit" disabled={busy}>
-          {busy
-            ? photos.length > 0
-              ? "Guardando y subiendo..."
-              : "Guardando..."
-            : "Guardar parte"}
-        </Button>
-      </form>
+        </form>
+      ) : null}
     </Layout>
   );
 }

@@ -228,6 +228,14 @@ def update_entry(
     _can_modify(entry, user)
 
     data = body.model_dump(exclude_unset=True)
+    if "obra_id" in data:
+        if user.role != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo el administrador puede cambiar la obra de un parte",
+            )
+        new_obra = get_obra_or_404(db, data["obra_id"])
+        entry.obra_id = new_obra.id
     if "work_date" in data:
         entry.work_date = data["work_date"]
     if "notes" in data:
