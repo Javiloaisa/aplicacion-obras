@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.deps import get_db, get_obra_or_404, require_admin
 from app.models import MediaFile, Obra, User, WorkEntry
 from app.schemas.informes import (
+    HorasEntryRow,
     HorasReportOut,
     HorasRow,
     ObraResumenOut,
@@ -41,6 +42,31 @@ def _entries_filter(stmt, obra_id, user_id, from_date, to_date):
     if to_date is not None:
         stmt = stmt.where(WorkEntry.work_date <= to_date)
     return stmt
+
+
+def _entries_detail(db, obra_id, user_id, from_date, to_date) -> list[HorasEntryRow]:
+    stmt = (
+        select(WorkEntry, Obra.name, User.full_name, User.trade)
+        .join(Obra, Obra.id == WorkEntry.obra_id)
+        .join(User, User.id == WorkEntry.user_id)
+        .order_by(WorkEntry.work_date.desc(), Obra.name, User.full_name)
+    )
+    stmt = _entries_filter(stmt, obra_id, user_id, from_date, to_date)
+    return [
+        HorasEntryRow(
+            id=entry.id,
+            obra_id=entry.obra_id,
+            obra_name=obra_name,
+            user_id=entry.user_id,
+            user_full_name=full_name,
+            trade=trade,
+            work_date=entry.work_date,
+            hours=entry.hours,
+            validated=entry.validated,
+            edited_by_admin=entry.edited_by_admin,
+        )
+        for entry, obra_name, full_name, trade in db.execute(stmt).all()
+    ]
 
 
 def _horas_report_data(db, obra_id, user_id, from_date, to_date) -> HorasReportOut:
@@ -76,6 +102,7 @@ def _horas_report_data(db, obra_id, user_id, from_date, to_date) -> HorasReportO
         )
     return HorasReportOut(
         rows=rows,
+        entries=_entries_detail(db, obra_id, user_id, from_date, to_date),
         by_trade=_group_by_trade(rows),
         total_hours=sum((r.total_hours for r in rows), Decimal("0")),
         total_entries=sum(r.entry_count for r in rows),
@@ -162,7 +189,7 @@ def horas_export_csv(
     buffer = io.StringIO()
     writer = csv.writer(buffer, delimiter=";")
     writer.writerow(
-        ["obra", "trabajador", "oficio", "fecha", "inicio", "fin", "horas", "notas"]
+        ["obra", "trabajador", "oficio", "fecha", "inicio", "fin", "horas", "validado", "notas"]
     )
     for entry, obra_name, full_name, trade in db.execute(stmt).all():
         writer.writerow(
@@ -174,6 +201,7 @@ def horas_export_csv(
                 entry.start_time.strftime("%H:%M") if entry.start_time else "",
                 entry.end_time.strftime("%H:%M") if entry.end_time else "",
                 str(entry.hours),
+                "Sí" if entry.validated else "No",
                 entry.notes or "",
             ]
         )

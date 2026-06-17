@@ -52,3 +52,4 @@ class WorkEntry(Base):
     edited_by_admin: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
     )
+    validated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

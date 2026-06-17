@@ -15,6 +15,19 @@ class HorasRow(BaseModel):
     entry_count: int
 
 
+class HorasEntryRow(BaseModel):
+    id: uuid.UUID
+    obra_id: uuid.UUID
+    obra_name: str
+    user_id: uuid.UUID
+    user_full_name: str
+    trade: str | None = None
+    work_date: date
+    hours: Decimal
+    validated: bool
+    edited_by_admin: bool
+
+
 class TradeHoursRow(BaseModel):
     trade: str | None = None
     total_hours: Decimal
@@ -22,6 +35,7 @@ class TradeHoursRow(BaseModel):
 
 class HorasReportOut(BaseModel):
     rows: list[HorasRow]
+    entries: list[HorasEntryRow]
     by_trade: list[TradeHoursRow]
     total_hours: Decimal
     total_entries: int

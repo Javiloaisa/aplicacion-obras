@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Download, Pencil, Trash2 } from "lucide-react";
+import { Check, Download, Pencil, Trash2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -77,6 +77,13 @@ export default function HorasTab({
     load();
   }
 
+  async function toggleValidated(entry: WorkEntry) {
+    await apiSend("PATCH", `/api/v1/entries/${entry.id}/validate`, {
+      validated: !entry.validated,
+    });
+    load();
+  }
+
   function exportCsv() {
     const params = buildParams();
     params.set("obra_id", obraId);
@@ -120,6 +127,7 @@ export default function HorasTab({
               <TableHead>Horario</TableHead>
               <TableHead className="text-right">Horas</TableHead>
               <TableHead>Notas</TableHead>
+              <TableHead>Validado</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -140,7 +148,23 @@ export default function HorasTab({
                   ) : null}
                 </TableCell>
                 <TableCell className="max-w-64 truncate">{entry.notes ?? "—"}</TableCell>
+                <TableCell>
+                  {entry.validated ? (
+                    <Badge variant="success">Validado</Badge>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">Pendiente</span>
+                  )}
+                </TableCell>
                 <TableCell className="text-right">
+                  {entry.validated ? (
+                    <Button variant="ghost" size="icon" onClick={() => toggleValidated(entry)} title="Quitar validación">
+                      <X />
+                    </Button>
+                  ) : (
+                    <Button variant="ghost" size="icon" onClick={() => toggleValidated(entry)} title="Validar horas">
+                      <Check />
+                    </Button>
+                  )}
                   <Button variant="ghost" size="icon" onClick={() => setEditing(entry)}>
                     <Pencil />
                   </Button>
@@ -152,7 +176,7 @@ export default function HorasTab({
             ))}
             {data && data.items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                   No hay partes con estos filtros.
                 </TableCell>
               </TableRow>
@@ -163,7 +187,7 @@ export default function HorasTab({
               <TableRow>
                 <TableCell colSpan={3}>Total</TableCell>
                 <TableCell className="text-right">{data.total_hours} h</TableCell>
-                <TableCell colSpan={2}>{data.count} partes</TableCell>
+                <TableCell colSpan={3}>{data.count} partes</TableCell>
               </TableRow>
             </TableFooter>
           ) : null}

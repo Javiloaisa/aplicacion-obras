@@ -52,6 +52,7 @@ Sistema compuesto por **dos aplicaciones independientes** sobre una **API común
 - `notes` (texto opcional, ej. "alicatado baño planta 1")
 - `created_at`, `updated_at`
 - `edited_by_admin` (bool, default false)
+- `validated` (bool, default false) — el admin valida cada parte individualmente; cualquier edición posterior de fecha/horas lo vuelve a marcar como no validado
 - Reglas: `hours` entre 0.25 y 16 por parte; máximo 24 h sumadas por trabajador y día.
 
 ### media_files
@@ -88,6 +89,7 @@ Sistema compuesto por **dos aplicaciones independientes** sobre una **API común
 - `GET /entries/mine?from=&to=` — historial del trabajador (con totales)
 - `PATCH /entries/{id}` — worker: solo los suyos y dentro de las 48 h tras crearlos; admin: cualquiera (marca `edited_by_admin`)
 - `DELETE /entries/{id}` — mismas reglas que PATCH
+- `PATCH /entries/{id}/validate` (admin) — body `{validated: bool}`; marca/desmarca el parte como validado
 
 ### Media
 - `POST /obras/{id}/media` — multipart, varios archivos; valida tipo/tamaño/magic bytes; miniatura en background (`BackgroundTasks`)
@@ -98,8 +100,8 @@ Sistema compuesto por **dos aplicaciones independientes** sobre una **API común
 - `DELETE /media/{id}` — autor dentro de 48 h, o admin
 
 ### Informes (admin)
-- `GET /informes/horas?from=&to=&obra_id=&user_id=` — agregado: por obra → por trabajador → total horas y nº de partes
-- `GET /informes/horas/export.csv?...` — CSV: obra, trabajador, fecha, inicio, fin, horas, notas
+- `GET /informes/horas?from=&to=&obra_id=&user_id=` — agregado por obra → trabajador (total horas y nº de partes) y listado de partes individuales (`entries`) con fecha y estado `validated`
+- `GET /informes/horas/export.csv?...` — CSV: obra, trabajador, fecha, inicio, fin, horas, validado, notas
 - `GET /informes/obra/{id}/resumen` — totales de la obra: horas por trabajador, nº fotos/vídeos, primer y último parte
 
 ### Usuarios (admin)

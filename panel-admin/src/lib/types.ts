@@ -66,6 +66,7 @@ export interface WorkEntry {
   created_at: string;
   updated_at: string;
   edited_by_admin: boolean;
+  validated: boolean;
   user_full_name: string | null;
   obra_name: string | null;
 }
@@ -122,8 +123,22 @@ export interface TradeHoursRow {
   total_hours: string;
 }
 
+export interface HorasEntryRow {
+  id: string;
+  obra_id: string;
+  obra_name: string;
+  user_id: string;
+  user_full_name: string;
+  trade: string | null;
+  work_date: string;
+  hours: string;
+  validated: boolean;
+  edited_by_admin: boolean;
+}
+
 export interface HorasReport {
   rows: HorasRow[];
+  entries: HorasEntryRow[];
   by_trade: TradeHoursRow[];
   total_hours: string;
   total_entries: number;

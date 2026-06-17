@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { Download, FileText } from "lucide-react";
+import { Check, Download, FileText, X } from "lucide-react";
 import Layout from "@/components/Layout";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,8 +15,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiDownload, apiGet } from "@/lib/api";
-import { thisMonthRange } from "@/lib/format";
+import { apiDownload, apiGet, apiSend } from "@/lib/api";
+import { formatDate, thisMonthRange } from "@/lib/format";
 import type { HorasReport, Obra, User } from "@/lib/types";
 
 export default function Informes() {
@@ -43,13 +44,20 @@ export default function Informes() {
     return params;
   }, [from, to, obraId, userId]);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     apiGet<HorasReport>(`/api/v1/informes/horas?${buildParams()}`)
       .then(setReport)
       .catch((err) =>
         setError(err instanceof Error ? err.message : "Error al cargar el informe"),
       );
   }, [buildParams]);
+
+  useEffect(load, [load]);
+
+  async function toggleValidated(entryId: string, validated: boolean) {
+    await apiSend("PATCH", `/api/v1/entries/${entryId}/validate`, { validated });
+    load();
+  }
 
   return (
     <Layout
@@ -140,37 +148,62 @@ export default function Informes() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Fecha</TableHead>
               <TableHead>Obra</TableHead>
               <TableHead>Trabajador</TableHead>
               <TableHead>Oficio</TableHead>
-              <TableHead className="text-right">Partes</TableHead>
               <TableHead className="text-right">Horas</TableHead>
+              <TableHead>Validado</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {report?.rows.map((row) => (
-              <TableRow key={`${row.obra_id}-${row.user_id}`}>
-                <TableCell>{row.obra_name}</TableCell>
-                <TableCell>{row.user_full_name}</TableCell>
-                <TableCell>{row.trade || <span className="text-muted-foreground">—</span>}</TableCell>
-                <TableCell className="text-right">{row.entry_count}</TableCell>
-                <TableCell className="text-right font-semibold">{row.total_hours}</TableCell>
+            {report?.entries.map((entry) => (
+              <TableRow key={entry.id}>
+                <TableCell>{formatDate(entry.work_date)}</TableCell>
+                <TableCell>{entry.obra_name}</TableCell>
+                <TableCell>{entry.user_full_name}</TableCell>
+                <TableCell>{entry.trade || <span className="text-muted-foreground">—</span>}</TableCell>
+                <TableCell className="text-right font-semibold">
+                  {entry.hours}
+                  {entry.edited_by_admin ? (
+                    <span title="Editado por administrador"> *</span>
+                  ) : null}
+                </TableCell>
+                <TableCell>
+                  {entry.validated ? (
+                    <Badge variant="success">Validado</Badge>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">Pendiente</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-right">
+                  {entry.validated ? (
+                    <Button variant="ghost" size="icon" onClick={() => toggleValidated(entry.id, false)} title="Quitar validación">
+                      <X />
+                    </Button>
+                  ) : (
+                    <Button variant="ghost" size="icon" onClick={() => toggleValidated(entry.id, true)} title="Validar horas">
+                      <Check />
+                    </Button>
+                  )}
+                </TableCell>
               </TableRow>
             ))}
-            {report && report.rows.length === 0 ? (
+            {report && report.entries.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                   No hay horas registradas con estos filtros.
                 </TableCell>
               </TableRow>
             ) : null}
           </TableBody>
-          {report && report.rows.length > 0 ? (
+          {report && report.entries.length > 0 ? (
             <TableFooter>
               <TableRow>
-                <TableCell colSpan={3}>Total</TableCell>
-                <TableCell className="text-right">{report.total_entries}</TableCell>
+                <TableCell colSpan={4}>Total</TableCell>
                 <TableCell className="text-right">{report.total_hours} h</TableCell>
+                <TableCell colSpan={2}>{report.total_entries} partes</TableCell>
               </TableRow>
             </TableFooter>
           ) : null}

@@ -23,6 +23,10 @@ class WorkEntryUpdate(BaseModel):
     notes: str | None = Field(None, max_length=1000)
 
 
+class WorkEntryValidate(BaseModel):
+    validated: bool
+
+
 class WorkEntryOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -37,6 +41,7 @@ class WorkEntryOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     edited_by_admin: bool
+    validated: bool
     user_full_name: str | None = None
     obra_name: str | None = None
 

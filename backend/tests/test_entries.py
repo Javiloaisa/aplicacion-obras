@@ -182,6 +182,54 @@ def test_edit_recomputes_hours_from_times(client, worker_headers, obra):
     assert float(res.json()["hours"]) == 8.0
 
 
+def test_admin_validates_entry(client, worker_headers, admin_headers, obra):
+    entry = create_entry(client, obra.id, worker_headers).json()
+    assert entry["validated"] is False
+
+    res = client.patch(
+        f"/api/v1/entries/{entry['id']}/validate",
+        json={"validated": True},
+        headers=admin_headers,
+    )
+    assert res.status_code == 200
+    assert res.json()["validated"] is True
+
+    res = client.patch(
+        f"/api/v1/entries/{entry['id']}/validate",
+        json={"validated": False},
+        headers=admin_headers,
+    )
+    assert res.status_code == 200
+    assert res.json()["validated"] is False
+
+
+def test_validate_entry_requires_admin(client, worker_headers, obra):
+    entry = create_entry(client, obra.id, worker_headers).json()
+    res = client.patch(
+        f"/api/v1/entries/{entry['id']}/validate",
+        json={"validated": True},
+        headers=worker_headers,
+    )
+    assert res.status_code == 403
+
+
+def test_editing_validated_entry_unvalidates_it(
+    client, worker_headers, admin_headers, obra
+):
+    entry = create_entry(client, obra.id, worker_headers).json()
+    client.patch(
+        f"/api/v1/entries/{entry['id']}/validate",
+        json={"validated": True},
+        headers=admin_headers,
+    )
+
+    res = client.patch(
+        f"/api/v1/entries/{entry['id']}", json={"hours": 6}, headers=admin_headers
+    )
+    assert res.status_code == 200
+    assert res.json()["validated"] is False
+
+
 def test_edit_respects_daily_cap(client, worker_headers, obra):
     create_entry(client, obra.id, worker_headers, hours=16)
     entry = create_entry(client, obra.id, worker_headers, hours=4).json()

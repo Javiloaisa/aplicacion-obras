@@ -11,6 +11,7 @@ from app.deps import (
     get_current_user,
     get_db,
     get_obra_or_404,
+    require_admin,
 )
 from app.models import Obra, User, WorkEntry
 from app.schemas.work_entry import (
@@ -18,6 +19,7 @@ from app.schemas.work_entry import (
     WorkEntryCreate,
     WorkEntryOut,
     WorkEntryUpdate,
+    WorkEntryValidate,
 )
 from app.utils import ensure_utc
 
@@ -247,6 +249,27 @@ def update_entry(
 
     if user.role == "admin":
         entry.edited_by_admin = True
+    # A change to the worked data invalidates a previous validation
+    if data.keys() - {"notes"}:
+        entry.validated = False
+    db.add(entry)
+    db.commit()
+    return entry
+
+
+@router.patch("/entries/{entry_id}/validate", response_model=WorkEntryOut)
+def validate_entry(
+    entry_id: uuid.UUID,
+    body: WorkEntryValidate,
+    _admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    entry = db.get(WorkEntry, entry_id)
+    if entry is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Parte no encontrado"
+        )
+    entry.validated = body.validated
     db.add(entry)
     db.commit()
     return entry
