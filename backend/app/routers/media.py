@@ -141,6 +141,7 @@ def list_obra_media(
     obra_id: uuid.UUID,
     kind: Literal["photo", "video"] | None = None,
     user_id: uuid.UUID | None = None,
+    work_entry_id: uuid.UUID | None = None,
     from_date: date | None = Query(None, alias="from"),
     to_date: date | None = Query(None, alias="to"),
     page: int = Query(1, ge=1),
@@ -156,6 +157,8 @@ def list_obra_media(
         filters.append(MediaFile.kind == kind)
     if user_id is not None:
         filters.append(MediaFile.user_id == user_id)
+    if work_entry_id is not None:
+        filters.append(MediaFile.work_entry_id == work_entry_id)
     if from_date is not None:
         filters.append(
             MediaFile.uploaded_at

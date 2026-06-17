@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { Check, Download, FileText, X } from "lucide-react";
+import { Camera, Check, Download, FileText, Pencil, X } from "lucide-react";
+import EditEntryForm from "@/components/EditEntryForm";
+import EntryMediaDialog from "@/components/EntryMediaDialog";
 import Layout from "@/components/Layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -17,7 +20,7 @@ import {
 } from "@/components/ui/table";
 import { apiDownload, apiGet, apiSend } from "@/lib/api";
 import { formatDate, thisMonthRange } from "@/lib/format";
-import type { HorasReport, Obra, User } from "@/lib/types";
+import type { HorasEntryRow, HorasReport, Obra, User } from "@/lib/types";
 
 export default function Informes() {
   const initial = thisMonthRange();
@@ -29,6 +32,8 @@ export default function Informes() {
   const [users, setUsers] = useState<User[]>([]);
   const [report, setReport] = useState<HorasReport | null>(null);
   const [error, setError] = useState("");
+  const [editing, setEditing] = useState<HorasEntryRow | null>(null);
+  const [mediaEntry, setMediaEntry] = useState<HorasEntryRow | null>(null);
 
   useEffect(() => {
     apiGet<Obra[]>("/api/v1/obras").then(setObras).catch(() => {});
@@ -154,6 +159,7 @@ export default function Informes() {
               <TableHead>Oficio</TableHead>
               <TableHead className="text-right">Horas</TableHead>
               <TableHead>Validado</TableHead>
+              <TableHead>Fotos</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -177,6 +183,16 @@ export default function Informes() {
                     <span className="text-sm text-muted-foreground">Pendiente</span>
                   )}
                 </TableCell>
+                <TableCell>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={entry.media_count === 0}
+                    onClick={() => setMediaEntry(entry)}
+                  >
+                    <Camera /> {entry.media_count}
+                  </Button>
+                </TableCell>
                 <TableCell className="text-right">
                   {entry.validated ? (
                     <Button variant="ghost" size="icon" onClick={() => toggleValidated(entry.id, false)} title="Quitar validación">
@@ -192,12 +208,15 @@ export default function Informes() {
                       <Check />
                     </Button>
                   )}
+                  <Button variant="ghost" size="icon" onClick={() => setEditing(entry)} title="Editar parte">
+                    <Pencil />
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
             {report && report.entries.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
                   No hay horas registradas con estos filtros.
                 </TableCell>
               </TableRow>
@@ -208,12 +227,38 @@ export default function Informes() {
               <TableRow>
                 <TableCell colSpan={4}>Total</TableCell>
                 <TableCell className="text-right">{report.total_hours} h</TableCell>
-                <TableCell colSpan={2}>{report.total_entries} partes</TableCell>
+                <TableCell colSpan={3}>{report.total_entries} partes</TableCell>
               </TableRow>
             </TableFooter>
           ) : null}
         </Table>
       </div>
+
+      <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar parte</DialogTitle>
+          </DialogHeader>
+          {editing ? (
+            <EditEntryForm
+              entry={editing}
+              onSaved={() => {
+                setEditing(null);
+                load();
+              }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {mediaEntry ? (
+        <EntryMediaDialog
+          obraId={mediaEntry.obra_id}
+          entryId={mediaEntry.id}
+          open={mediaEntry !== null}
+          onClose={() => setMediaEntry(null)}
+        />
+      ) : null}
     </Layout>
   );
 }

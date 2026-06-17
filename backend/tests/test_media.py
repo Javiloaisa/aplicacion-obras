@@ -118,6 +118,42 @@ def test_list_media_with_filters_and_pagination(
     assert data["pages"] == 2
 
 
+def test_list_media_filters_by_work_entry(client, worker_headers, admin_headers, obra):
+    entry = client.post(
+        f"/api/v1/obras/{obra.id}/entries",
+        json={"work_date": "2026-06-09", "hours": 8},
+        headers=worker_headers,
+    ).json()
+    other_entry = client.post(
+        f"/api/v1/obras/{obra.id}/entries",
+        json={"work_date": "2026-06-10", "hours": 4},
+        headers=worker_headers,
+    ).json()
+
+    files = [("files", ("foto.jpg", make_jpeg(), "application/octet-stream"))]
+    client.post(
+        f"/api/v1/obras/{obra.id}/media",
+        files=files,
+        data={"work_entry_id": entry["id"]},
+        headers=worker_headers,
+    )
+    client.post(
+        f"/api/v1/obras/{obra.id}/media",
+        files=[("files", ("otra.jpg", make_jpeg(), "application/octet-stream"))],
+        data={"work_entry_id": other_entry["id"]},
+        headers=worker_headers,
+    )
+
+    res = client.get(
+        f"/api/v1/obras/{obra.id}/media?work_entry_id={entry['id']}",
+        headers=admin_headers,
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["total"] == 1
+    assert data["items"][0]["work_entry_id"] == entry["id"]
+
+
 def test_worker_lists_media_of_any_active_obra(
     client, worker_headers, other_obra
 ):

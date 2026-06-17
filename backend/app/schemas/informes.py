@@ -24,8 +24,10 @@ class HorasEntryRow(BaseModel):
     trade: str | None = None
     work_date: date
     hours: Decimal
+    notes: str | None = None
     validated: bool
     edited_by_admin: bool
+    media_count: int
 
 
 class TradeHoursRow(BaseModel):

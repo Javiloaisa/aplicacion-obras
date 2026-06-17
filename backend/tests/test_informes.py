@@ -1,3 +1,6 @@
+from tests.test_media import make_jpeg
+
+
 def create_entry(client, obra_id, headers, **overrides):
     payload = {"work_date": "2026-06-09", "hours": 8}
     payload.update(overrides)
@@ -37,6 +40,26 @@ def test_horas_report_groups_by_obra_and_worker(
     row = by_key[(str(obra.id), str(worker.id))]
     assert float(row["total_hours"]) == 12.0
     assert row["entry_count"] == 2
+
+
+def test_horas_report_entries_include_notes_and_media_count(
+    client, admin_headers, worker_headers, obra
+):
+    entry = create_entry(
+        client, obra.id, worker_headers, notes="alicatado baño"
+    ).json()
+    files = [("files", ("foto.jpg", make_jpeg(), "application/octet-stream"))]
+    client.post(
+        f"/api/v1/obras/{obra.id}/media",
+        files=files,
+        data={"work_entry_id": entry["id"]},
+        headers=worker_headers,
+    )
+
+    data = client.get("/api/v1/informes/horas", headers=admin_headers).json()
+    (row,) = [e for e in data["entries"] if e["id"] == entry["id"]]
+    assert row["notes"] == "alicatado baño"
+    assert row["media_count"] == 1
 
 
 def test_horas_report_filters(

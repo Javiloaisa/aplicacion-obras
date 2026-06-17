@@ -132,8 +132,10 @@ export interface HorasEntryRow {
   trade: string | null;
   work_date: string;
   hours: string;
+  notes: string | null;
   validated: boolean;
   edited_by_admin: boolean;
+  media_count: number;
 }
 
 export interface HorasReport {

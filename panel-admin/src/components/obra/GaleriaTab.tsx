@@ -164,7 +164,7 @@ export default function GaleriaTab({
 }
 
 /** Full-size media viewer: fetches the original through the auth client. */
-function Lightbox({ item }: { item: MediaItem }) {
+export function Lightbox({ item }: { item: MediaItem }) {
   const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {

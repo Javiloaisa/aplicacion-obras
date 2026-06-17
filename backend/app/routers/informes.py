@@ -44,9 +44,17 @@ def _entries_filter(stmt, obra_id, user_id, from_date, to_date):
     return stmt
 
 
+_MEDIA_COUNT_SUBQ = (
+    select(func.count(MediaFile.id))
+    .where(MediaFile.work_entry_id == WorkEntry.id)
+    .correlate(WorkEntry)
+    .scalar_subquery()
+)
+
+
 def _entries_detail(db, obra_id, user_id, from_date, to_date) -> list[HorasEntryRow]:
     stmt = (
-        select(WorkEntry, Obra.name, User.full_name, User.trade)
+        select(WorkEntry, Obra.name, User.full_name, User.trade, _MEDIA_COUNT_SUBQ)
         .join(Obra, Obra.id == WorkEntry.obra_id)
         .join(User, User.id == WorkEntry.user_id)
         .order_by(WorkEntry.work_date.desc(), Obra.name, User.full_name)
@@ -62,10 +70,12 @@ def _entries_detail(db, obra_id, user_id, from_date, to_date) -> list[HorasEntry
             trade=trade,
             work_date=entry.work_date,
             hours=entry.hours,
+            notes=entry.notes,
             validated=entry.validated,
             edited_by_admin=entry.edited_by_admin,
+            media_count=media_count,
         )
-        for entry, obra_name, full_name, trade in db.execute(stmt).all()
+        for entry, obra_name, full_name, trade, media_count in db.execute(stmt).all()
     ]
 
 
