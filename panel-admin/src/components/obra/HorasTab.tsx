@@ -161,7 +161,12 @@ export default function HorasTab({
                       <X />
                     </Button>
                   ) : (
-                    <Button variant="ghost" size="icon" onClick={() => toggleValidated(entry)} title="Validar horas">
+                    <Button
+                      size="icon"
+                      className="bg-green-600 text-white hover:bg-green-700"
+                      onClick={() => toggleValidated(entry)}
+                      title="Validar horas"
+                    >
                       <Check />
                     </Button>
                   )}

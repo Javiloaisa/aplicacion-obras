@@ -183,7 +183,12 @@ export default function Informes() {
                       <X />
                     </Button>
                   ) : (
-                    <Button variant="ghost" size="icon" onClick={() => toggleValidated(entry.id, true)} title="Validar horas">
+                    <Button
+                      size="icon"
+                      className="bg-green-600 text-white hover:bg-green-700"
+                      onClick={() => toggleValidated(entry.id, true)}
+                      title="Validar horas"
+                    >
                       <Check />
                     </Button>
                   )}
