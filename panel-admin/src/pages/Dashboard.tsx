@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import AuthImg from "@/components/AuthImg";
 import Layout from "@/components/Layout";
 import { apiGet } from "@/lib/api";
-import { thisWeekRange, todayISO } from "@/lib/format";
+import { formatHours, thisWeekRange, todayISO } from "@/lib/format";
 import type { HorasReport, MediaItem, Obra } from "@/lib/types";
 
 export default function Dashboard() {
@@ -64,7 +64,7 @@ export default function Dashboard() {
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <KpiCard label="Obras activas" value={obras?.length ?? "—"} />
-        <KpiCard label="Horas esta semana" value={week ? `${week.total_hours} h` : "—"} />
+        <KpiCard label="Horas esta semana" value={week ? formatHours(week.total_hours) : "—"} />
         <KpiCard label="Trabajadores activos hoy" value={today ? activeToday : "—"} />
       </div>
 
@@ -166,10 +166,10 @@ function HoursBarChart({ data }: { data: { name: string; horas: number }[] }) {
           axisLine={false}
         />
         <Tooltip
-          formatter={(value) => [`${value} h`, "Horas"]}
+          formatter={(value) => [formatHours(value as number), "Horas"]}
           cursor={{ fill: "rgba(249,180,20,0.1)" }}
         />
-        <Bar dataKey="horas" fill="#f9b414" radius={[0, 6, 6, 0]} label={{ position: "right", fontSize: 12, fill: "#32373c" }} />
+        <Bar dataKey="horas" fill="#f9b414" radius={[0, 6, 6, 0]} label={{ position: "right", fontSize: 12, fill: "#32373c", formatter: (v: number) => formatHours(v) }} />
       </BarChart>
     </ResponsiveContainer>
   );

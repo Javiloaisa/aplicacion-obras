@@ -19,7 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { apiDownload, apiGet, apiSend } from "@/lib/api";
-import { formatDate, thisMonthRange } from "@/lib/format";
+import { formatDate, formatHours, thisMonthRange } from "@/lib/format";
 import type { HorasEntryRow, HorasReport, Obra, User } from "@/lib/types";
 
 export default function Informes() {
@@ -118,7 +118,7 @@ export default function Informes() {
       <div className="mb-4 grid gap-3 sm:grid-cols-2">
         <div className="rounded-xl border bg-card p-4">
           <p className="text-sm text-muted-foreground">Horas totales</p>
-          <p className="text-2xl font-bold">{report?.total_hours ?? "0"} h</p>
+          <p className="text-2xl font-bold">{report ? formatHours(report.total_hours) : "0h 00m"}</p>
         </div>
         <div className="rounded-xl border bg-card p-4">
           <p className="text-sm text-muted-foreground">Partes</p>
@@ -141,7 +141,7 @@ export default function Informes() {
               {report.by_trade.map((t) => (
                 <TableRow key={t.trade ?? "—"}>
                   <TableCell>{t.trade || <span className="text-muted-foreground">Sin oficio</span>}</TableCell>
-                  <TableCell className="text-right">{t.total_hours} h</TableCell>
+                  <TableCell className="text-right">{formatHours(t.total_hours)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -171,7 +171,7 @@ export default function Informes() {
                 <TableCell>{entry.user_full_name}</TableCell>
                 <TableCell>{entry.trade || <span className="text-muted-foreground">—</span>}</TableCell>
                 <TableCell className="text-right font-semibold">
-                  {entry.hours}
+                  {formatHours(entry.hours)}
                   {entry.edited_by_admin ? (
                     <span title="Editado por administrador"> *</span>
                   ) : null}
@@ -226,7 +226,7 @@ export default function Informes() {
             <TableFooter>
               <TableRow>
                 <TableCell colSpan={4}>Total</TableCell>
-                <TableCell className="text-right">{report.total_hours} h</TableCell>
+                <TableCell className="text-right">{formatHours(report.total_hours)}</TableCell>
                 <TableCell colSpan={3}>{report.total_entries} partes</TableCell>
               </TableRow>
             </TableFooter>

@@ -18,6 +18,7 @@ from app.schemas.informes import (
     TradeHoursRow,
     WorkerHoursRow,
 )
+from app.services.format import hours_hm
 
 router = APIRouter(prefix="/informes", tags=["informes"])
 
@@ -210,7 +211,7 @@ def horas_export_csv(
                 entry.work_date.isoformat(),
                 entry.start_time.strftime("%H:%M") if entry.start_time else "",
                 entry.end_time.strftime("%H:%M") if entry.end_time else "",
-                str(entry.hours),
+                hours_hm(entry.hours),
                 "Sí" if entry.validated else "No",
                 entry.notes or "",
             ]

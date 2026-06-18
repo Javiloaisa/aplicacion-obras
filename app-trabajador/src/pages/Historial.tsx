@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Layout from "../components/Layout";
 import { EmptyState, ErrorMessage, Spinner } from "../components/ui";
 import { apiGet } from "../lib/api";
+import { formatHours } from "../lib/format";
 import type { EntriesList } from "../lib/types";
 
 function toISO(date: Date): string {
@@ -74,7 +75,7 @@ export default function Historial() {
       {data ? (
         <>
           <div className="mb-4 rounded-2xl bg-gray-900 p-5 text-center text-white">
-            <div className="text-4xl font-bold">{data.total_hours} h</div>
+            <div className="text-4xl font-bold">{formatHours(data.total_hours)}</div>
             <div className="text-gray-300">
               {data.count} {data.count === 1 ? "parte" : "partes"}
             </div>
@@ -91,7 +92,7 @@ export default function Historial() {
                       {formatDate(entry.work_date)}
                     </span>
                     <span className="text-lg font-bold text-brand-600">
-                      {entry.hours} h
+                      {formatHours(entry.hours)}
                     </span>
                   </div>
                   <div className="text-sm text-gray-500">{entry.obra_name}</div>

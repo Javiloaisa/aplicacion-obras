@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import { Button, EmptyState, ErrorMessage, Field, Input, Select, Spinner, Textarea } from "../components/ui";
 import { apiGet, apiSend, SessionExpiredError } from "../lib/api";
+import { formatHours } from "../lib/format";
 import { enqueue, isRetryable } from "../lib/offline-queue";
 import { compressPhoto, uploadMediaFile } from "../lib/upload";
 import type { Obra, WorkEntry } from "../lib/types";
@@ -342,7 +343,7 @@ export default function Parte() {
               </div>
               {preview !== null ? (
                 <p className="text-center text-lg font-semibold text-brand-600">
-                  {preview} horas
+                  {formatHours(preview)}
                 </p>
               ) : null}
             </>

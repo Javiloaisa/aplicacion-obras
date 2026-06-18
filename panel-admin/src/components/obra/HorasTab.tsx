@@ -21,7 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { apiDownload, apiGet, apiSend } from "@/lib/api";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatHours } from "@/lib/format";
 import type { EntriesList, User, WorkEntry } from "@/lib/types";
 
 export default function HorasTab({
@@ -111,7 +111,7 @@ export default function HorasTab({
         <div className="mb-4 flex flex-wrap gap-2">
           {[...totals.values()].map((t) => (
             <Badge key={t.name} variant="secondary" className="text-sm">
-              {t.name}: {t.hours} h ({t.count})
+              {t.name}: {formatHours(t.hours)} ({t.count})
             </Badge>
           ))}
         </div>
@@ -141,7 +141,7 @@ export default function HorasTab({
                     : "—"}
                 </TableCell>
                 <TableCell className="text-right font-semibold">
-                  {entry.hours}
+                  {formatHours(entry.hours)}
                   {entry.edited_by_admin ? (
                     <span title="Editado por administrador"> *</span>
                   ) : null}
@@ -190,7 +190,7 @@ export default function HorasTab({
             <TableFooter>
               <TableRow>
                 <TableCell colSpan={3}>Total</TableCell>
-                <TableCell className="text-right">{data.total_hours} h</TableCell>
+                <TableCell className="text-right">{formatHours(data.total_hours)}</TableCell>
                 <TableCell colSpan={3}>{data.count} partes</TableCell>
               </TableRow>
             </TableFooter>

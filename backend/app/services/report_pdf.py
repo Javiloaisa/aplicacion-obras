@@ -3,7 +3,6 @@
 Pure-python via reportlab so it needs no system libraries in the container.
 """
 import io
-from decimal import Decimal
 from pathlib import Path
 
 from reportlab.lib import colors
@@ -21,6 +20,7 @@ from reportlab.platypus import (
 from reportlab.lib.styles import ParagraphStyle
 
 from app.schemas.informes import HorasReportOut
+from app.services.format import hours_hm
 
 INK = colors.HexColor("#32373c")
 BRAND = colors.HexColor("#f9b414")
@@ -36,16 +36,8 @@ _sub = ParagraphStyle("sub", fontName="Helvetica", fontSize=10, textColor=GREY, 
 _h2 = ParagraphStyle("h2", fontName="Helvetica-Bold", fontSize=11, textColor=INK, spaceBefore=10, spaceAfter=4)
 
 
-def _dec(value, suffix: str = "") -> str:
-    """Spanish-formatted decimal: 1234.5 -> '1.234,50'."""
-    if value is None:
-        return "—"
-    s = f"{Decimal(value):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    return f"{s}{suffix}"
-
-
 def _hours(value) -> str:
-    return _dec(value, " h")
+    return hours_hm(value)
 
 
 def _draw_chrome(canvas, doc):
