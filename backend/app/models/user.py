@@ -18,6 +18,9 @@ class User(Base):
     # Trade/speciality (albañil, fontanero, electricista...), free string
     trade: Mapped[str | None] = mapped_column(String(50))
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Reversible-encrypted copy of the current password so an admin can look it up
+    # when a worker forgets it. Null for accounts created before this feature.
+    password_enc: Mapped[str | None] = mapped_column(String(512))
     role: Mapped[str] = mapped_column(
         Enum("admin", "worker", name="user_role", native_enum=False),
         nullable=False,

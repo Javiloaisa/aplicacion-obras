@@ -151,6 +151,39 @@ def test_admin_sets_custom_password(client, admin_headers, worker):
     assert login.status_code == 200
 
 
+def test_admin_reveals_password_after_set(client, admin_headers, worker):
+    client.patch(
+        f"/api/v1/usuarios/{worker.id}",
+        json={"new_password": "supersecreta123"},
+        headers=admin_headers,
+    )
+    res = client.get(f"/api/v1/usuarios/{worker.id}/password", headers=admin_headers)
+    assert res.status_code == 200
+    assert res.json()["password"] == "supersecreta123"
+
+
+def test_revealed_password_matches_reset_temp(client, admin_headers, worker):
+    reset = client.patch(
+        f"/api/v1/usuarios/{worker.id}",
+        json={"reset_password": True},
+        headers=admin_headers,
+    ).json()
+    res = client.get(f"/api/v1/usuarios/{worker.id}/password", headers=admin_headers)
+    assert res.json()["password"] == reset["temp_password"]
+
+
+def test_reveal_password_none_for_legacy_account(client, admin_headers, worker):
+    # The fixture sets only the hash (no encrypted copy), like pre-feature accounts
+    res = client.get(f"/api/v1/usuarios/{worker.id}/password", headers=admin_headers)
+    assert res.status_code == 200
+    assert res.json()["password"] is None
+
+
+def test_reveal_password_requires_admin(client, worker_headers, worker):
+    res = client.get(f"/api/v1/usuarios/{worker.id}/password", headers=worker_headers)
+    assert res.status_code == 403
+
+
 def test_new_password_too_short_rejected(client, admin_headers, worker):
     res = client.patch(
         f"/api/v1/usuarios/{worker.id}",

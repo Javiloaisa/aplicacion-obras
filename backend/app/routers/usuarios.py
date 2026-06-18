@@ -9,12 +9,13 @@ from sqlalchemy.orm import Session
 from app.deps import get_db, require_admin
 from app.models import MediaFile, User, WorkEntry
 from app.schemas.user import (
+    PasswordReveal,
     UserCreate,
     UserOut,
     UserUpdate,
     UserWithTempPassword,
 )
-from app.security import hash_password
+from app.security import decrypt_password, set_password
 
 router = APIRouter(prefix="/usuarios", tags=["usuarios"])
 
@@ -57,9 +58,8 @@ def create_usuario(
         phone=body.phone,
         trade=body.trade,
         role=body.role,
-        password_hash=hash_password(temp_password),
-        must_change_password=True,
     )
+    set_password(user, temp_password, must_change=True)
     db.add(user)
     db.commit()
 
@@ -99,12 +99,10 @@ def update_usuario(
 
     temp_password = None
     if new_password:
-        user.password_hash = hash_password(new_password)
-        user.must_change_password = False
+        set_password(user, new_password, must_change=False)
     elif reset_password:
         temp_password = _temp_password()
-        user.password_hash = hash_password(temp_password)
-        user.must_change_password = True
+        set_password(user, temp_password, must_change=True)
 
     db.add(user)
     db.commit()
@@ -112,6 +110,25 @@ def update_usuario(
     out = UserWithTempPassword.model_validate(user)
     out.temp_password = temp_password
     return out
+
+
+@router.get("/{user_id}/password", response_model=PasswordReveal)
+def reveal_password(
+    user_id: uuid.UUID,
+    _admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Return a worker's current password so the admin can remind them of it.
+
+    Only accounts whose password was set after this feature shipped have a
+    recoverable copy; older ones return null and must be reset instead.
+    """
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
+        )
+    return PasswordReveal(password=decrypt_password(user.password_enc))
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)

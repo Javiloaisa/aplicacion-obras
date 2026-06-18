@@ -18,7 +18,7 @@ from app.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
-    hash_password,
+    set_password,
     verify_password,
 )
 
@@ -89,8 +89,7 @@ def change_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="La contraseña actual no es correcta",
         )
-    user.password_hash = hash_password(body.new_password)
-    user.must_change_password = False
+    set_password(user, body.new_password, must_change=False)
     db.add(user)
     db.commit()
     return MessageResponse(detail="Contraseña actualizada")

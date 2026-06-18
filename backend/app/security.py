@@ -1,7 +1,10 @@
+import base64
+import hashlib
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 
+from cryptography.fernet import Fernet, InvalidToken
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
@@ -11,6 +14,11 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 TokenType = Literal["access", "refresh"]
 
+# Reversible encryption for the admin "consultar contraseña" feature. The key is
+# derived from JWT_SECRET so no extra config is needed; encrypting (rather than
+# storing plaintext) keeps the off-site DB backups from leaking credentials.
+_fernet = Fernet(base64.urlsafe_b64encode(hashlib.sha256(settings.jwt_secret.encode()).digest()))
+
 
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
@@ -18,6 +26,28 @@ def hash_password(password: str) -> str:
 
 def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
+
+
+def encrypt_password(plain: str) -> str:
+    """Encrypt a password so an admin can read it back later."""
+    return _fernet.encrypt(plain.encode()).decode()
+
+
+def decrypt_password(token: str | None) -> str | None:
+    """Decrypt a stored password, or None if absent/undecryptable (e.g. legacy rows)."""
+    if not token:
+        return None
+    try:
+        return _fernet.decrypt(token.encode()).decode()
+    except InvalidToken:
+        return None
+
+
+def set_password(user, plain: str, *, must_change: bool) -> None:
+    """Set both the bcrypt hash (for login) and the encrypted copy (for admin recovery)."""
+    user.password_hash = hash_password(plain)
+    user.password_enc = encrypt_password(plain)
+    user.must_change_password = must_change
 
 
 def _create_token(user_id: uuid.UUID, token_type: TokenType, expires_delta: timedelta) -> str:

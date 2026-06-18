@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { KeyRound, Lock, Pencil, Plus, Trash2 } from "lucide-react";
+import { Eye, KeyRound, Lock, Pencil, Plus, Trash2 } from "lucide-react";
 import Layout from "@/components/Layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,7 @@ export default function Usuarios() {
   const [editUser, setEditUser] = useState<User | null>(null);
   const [passwordUser, setPasswordUser] = useState<User | null>(null);
   const [tempPassword, setTempPassword] = useState<{ name: string; password: string } | null>(null);
+  const [shownPassword, setShownPassword] = useState<{ name: string; password: string } | null>(null);
 
   const load = useCallback(() => {
     apiGet<User[]>("/api/v1/usuarios")
@@ -69,6 +70,23 @@ export default function Usuarios() {
     );
     if (updated.temp_password) {
       setTempPassword({ name: user.full_name, password: updated.temp_password });
+    }
+  }
+
+  async function revealPassword(user: User) {
+    try {
+      const res = await apiGet<{ password: string | null }>(
+        `/api/v1/usuarios/${user.id}/password`,
+      );
+      if (res.password) {
+        setShownPassword({ name: user.full_name, password: res.password });
+      } else {
+        window.alert(
+          "No hay contraseña guardada para mostrar. Asígnale una nueva con “Contraseña” o “Reset”; las creadas antes de esta función no se pueden recuperar.",
+        );
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo consultar la contraseña");
     }
   }
 
@@ -162,6 +180,11 @@ export default function Usuarios() {
                   <Button variant="outline" size="sm" onClick={() => resetPassword(user)}>
                     <KeyRound /> Reset
                   </Button>
+                  {user.role === "worker" ? (
+                    <Button variant="outline" size="sm" onClick={() => revealPassword(user)}>
+                      <Eye /> Ver
+                    </Button>
+                  ) : null}
                   {user.id !== me?.id ? (
                     <>
                       <Button
@@ -220,6 +243,34 @@ export default function Usuarios() {
               user={passwordUser}
               onSaved={() => setPasswordUser(null)}
             />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* Consult current password */}
+      <Dialog
+        open={shownPassword !== null}
+        onOpenChange={(open) => !open && setShownPassword(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Contraseña de {shownPassword?.name}</DialogTitle>
+            <DialogDescription>
+              Trátala con cuidado: cualquiera con ella puede entrar como este trabajador.
+            </DialogDescription>
+          </DialogHeader>
+          {shownPassword ? (
+            <div className="space-y-3 text-center">
+              <p className="select-all rounded-md bg-muted p-4 font-mono text-2xl tracking-wider">
+                {shownPassword.password}
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => navigator.clipboard?.writeText(shownPassword.password)}
+              >
+                Copiar
+              </Button>
+            </div>
           ) : null}
         </DialogContent>
       </Dialog>

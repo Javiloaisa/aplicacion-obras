@@ -60,3 +60,8 @@ class UserUpdate(BaseModel):
 
 class UserWithTempPassword(UserOut):
     temp_password: str | None = None
+
+
+class PasswordReveal(BaseModel):
+    # None when the account has no recoverable password (created before the feature)
+    password: str | None = None
