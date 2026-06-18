@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Camera, Check, Download, FileText, Pencil, X } from "lucide-react";
 import EditEntryForm from "@/components/EditEntryForm";
 import EntryMediaDialog from "@/components/EntryMediaDialog";
@@ -23,12 +24,15 @@ import { formatDate, formatHours, thisMonthRange } from "@/lib/format";
 import type { HorasEntryRow, HorasReport, Obra, User } from "@/lib/types";
 
 export default function Informes() {
+  // Initial filters can be preset from the URL (e.g. dashboard links). An empty
+  // `from`/`to` in the URL means "all history"; absent means default to this month.
+  const [searchParams] = useSearchParams();
   const initial = thisMonthRange();
-  const [from, setFrom] = useState(initial.from);
-  const [to, setTo] = useState(initial.to);
-  const [obraId, setObraId] = useState("");
-  const [userId, setUserId] = useState("");
-  const [validated, setValidated] = useState("");
+  const [from, setFrom] = useState(searchParams.get("from") ?? initial.from);
+  const [to, setTo] = useState(searchParams.get("to") ?? initial.to);
+  const [obraId, setObraId] = useState(searchParams.get("obra_id") ?? "");
+  const [userId, setUserId] = useState(searchParams.get("user_id") ?? "");
+  const [validated, setValidated] = useState(searchParams.get("validated") ?? "");
   const [obras, setObras] = useState<Obra[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [report, setReport] = useState<HorasReport | null>(null);
