@@ -28,6 +28,7 @@ export default function Informes() {
   const [to, setTo] = useState(initial.to);
   const [obraId, setObraId] = useState("");
   const [userId, setUserId] = useState("");
+  const [validated, setValidated] = useState("");
   const [obras, setObras] = useState<Obra[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [report, setReport] = useState<HorasReport | null>(null);
@@ -46,8 +47,9 @@ export default function Informes() {
     if (to) params.set("to", to);
     if (obraId) params.set("obra_id", obraId);
     if (userId) params.set("user_id", userId);
+    if (validated) params.set("validated", validated);
     return params;
-  }, [from, to, obraId, userId]);
+  }, [from, to, obraId, userId, validated]);
 
   const load = useCallback(() => {
     apiGet<HorasReport>(`/api/v1/informes/horas?${buildParams()}`)
@@ -83,7 +85,7 @@ export default function Informes() {
         </div>
       }
     >
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div className="space-y-1">
           <Label htmlFor="from">Desde</Label>
           <Input id="from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -108,6 +110,14 @@ export default function Informes() {
             {users.map((user) => (
               <option key={user.id} value={user.id}>{user.full_name}</option>
             ))}
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="validated">Validado</Label>
+          <Select id="validated" value={validated} onChange={(e) => setValidated(e.target.value)}>
+            <option value="">Todos</option>
+            <option value="true">Validados</option>
+            <option value="false">Pendientes</option>
           </Select>
         </div>
       </div>

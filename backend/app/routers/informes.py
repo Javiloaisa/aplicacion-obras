@@ -33,7 +33,7 @@ def _group_by_trade(rows) -> list[TradeHoursRow]:
     return [TradeHoursRow(trade=t, total_hours=hours[t]) for t in keys]
 
 
-def _entries_filter(stmt, obra_id, user_id, from_date, to_date):
+def _entries_filter(stmt, obra_id, user_id, from_date, to_date, validated=None):
     if obra_id is not None:
         stmt = stmt.where(WorkEntry.obra_id == obra_id)
     if user_id is not None:
@@ -42,6 +42,8 @@ def _entries_filter(stmt, obra_id, user_id, from_date, to_date):
         stmt = stmt.where(WorkEntry.work_date >= from_date)
     if to_date is not None:
         stmt = stmt.where(WorkEntry.work_date <= to_date)
+    if validated is not None:
+        stmt = stmt.where(WorkEntry.validated == validated)
     return stmt
 
 
@@ -53,14 +55,14 @@ _MEDIA_COUNT_SUBQ = (
 )
 
 
-def _entries_detail(db, obra_id, user_id, from_date, to_date) -> list[HorasEntryRow]:
+def _entries_detail(db, obra_id, user_id, from_date, to_date, validated=None) -> list[HorasEntryRow]:
     stmt = (
         select(WorkEntry, Obra.name, User.full_name, User.trade, _MEDIA_COUNT_SUBQ)
         .join(Obra, Obra.id == WorkEntry.obra_id)
         .join(User, User.id == WorkEntry.user_id)
         .order_by(WorkEntry.work_date.desc(), Obra.name, User.full_name)
     )
-    stmt = _entries_filter(stmt, obra_id, user_id, from_date, to_date)
+    stmt = _entries_filter(stmt, obra_id, user_id, from_date, to_date, validated)
     return [
         HorasEntryRow(
             id=entry.id,
@@ -80,7 +82,7 @@ def _entries_detail(db, obra_id, user_id, from_date, to_date) -> list[HorasEntry
     ]
 
 
-def _horas_report_data(db, obra_id, user_id, from_date, to_date) -> HorasReportOut:
+def _horas_report_data(db, obra_id, user_id, from_date, to_date, validated=None) -> HorasReportOut:
     stmt = (
         select(
             Obra.id,
@@ -96,7 +98,7 @@ def _horas_report_data(db, obra_id, user_id, from_date, to_date) -> HorasReportO
         .group_by(Obra.id, Obra.name, User.id, User.full_name, User.trade)
         .order_by(Obra.name, User.full_name)
     )
-    stmt = _entries_filter(stmt, obra_id, user_id, from_date, to_date)
+    stmt = _entries_filter(stmt, obra_id, user_id, from_date, to_date, validated)
 
     rows = []
     for o_id, o_name, u_id, u_name, trade, hours, count in db.execute(stmt).all():
@@ -113,7 +115,7 @@ def _horas_report_data(db, obra_id, user_id, from_date, to_date) -> HorasReportO
         )
     return HorasReportOut(
         rows=rows,
-        entries=_entries_detail(db, obra_id, user_id, from_date, to_date),
+        entries=_entries_detail(db, obra_id, user_id, from_date, to_date, validated),
         by_trade=_group_by_trade(rows),
         total_hours=sum((r.total_hours for r in rows), Decimal("0")),
         total_entries=sum(r.entry_count for r in rows),
@@ -137,10 +139,11 @@ def horas_report(
     user_id: uuid.UUID | None = None,
     from_date: date | None = Query(None, alias="from"),
     to_date: date | None = Query(None, alias="to"),
+    validated: bool | None = None,
     _admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    return _horas_report_data(db, obra_id, user_id, from_date, to_date)
+    return _horas_report_data(db, obra_id, user_id, from_date, to_date, validated)
 
 
 @router.get("/horas/export.pdf")
@@ -149,6 +152,7 @@ def horas_export_pdf(
     user_id: uuid.UUID | None = None,
     from_date: date | None = Query(None, alias="from"),
     to_date: date | None = Query(None, alias="to"),
+    validated: bool | None = None,
     _admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
@@ -156,7 +160,7 @@ def horas_export_pdf(
 
     from app.services.report_pdf import build_horas_pdf
 
-    data = _horas_report_data(db, obra_id, user_id, from_date, to_date)
+    data = _horas_report_data(db, obra_id, user_id, from_date, to_date, validated)
     obra = db.get(Obra, obra_id) if obra_id else None
     worker = db.get(User, user_id) if user_id else None
     generated = datetime.now(ZoneInfo("Europe/Madrid")).strftime("%d/%m/%Y %H:%M")
@@ -186,6 +190,7 @@ def horas_export_csv(
     user_id: uuid.UUID | None = None,
     from_date: date | None = Query(None, alias="from"),
     to_date: date | None = Query(None, alias="to"),
+    validated: bool | None = None,
     _admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
@@ -195,7 +200,7 @@ def horas_export_csv(
         .join(User, User.id == WorkEntry.user_id)
         .order_by(Obra.name, User.full_name, WorkEntry.work_date)
     )
-    stmt = _entries_filter(stmt, obra_id, user_id, from_date, to_date)
+    stmt = _entries_filter(stmt, obra_id, user_id, from_date, to_date, validated)
 
     buffer = io.StringIO()
     writer = csv.writer(buffer, delimiter=";")

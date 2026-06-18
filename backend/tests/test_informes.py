@@ -19,6 +19,35 @@ def seed_entries(client, admin_headers, obra, other_obra, worker, worker2):
     create_entry(client, other_obra.id, admin_headers, user_id=str(worker.id), hours=5)
 
 
+def test_horas_report_filter_validated(
+    client, admin_headers, obra, other_obra, worker, worker2
+):
+    seed_entries(client, admin_headers, obra, other_obra, worker, worker2)
+    full = client.get("/api/v1/informes/horas", headers=admin_headers).json()
+
+    # Entries start pending: validated=false returns all, validated=true none
+    pending = client.get(
+        "/api/v1/informes/horas?validated=false", headers=admin_headers
+    ).json()
+    assert pending["total_entries"] == full["total_entries"]
+    validated = client.get(
+        "/api/v1/informes/horas?validated=true", headers=admin_headers
+    ).json()
+    assert validated["total_entries"] == 0
+
+    # Validate one entry and confirm it is the only one in validated=true
+    entry_id = full["entries"][0]["id"]
+    client.patch(
+        f"/api/v1/entries/{entry_id}/validate",
+        json={"validated": True},
+        headers=admin_headers,
+    )
+    validated = client.get(
+        "/api/v1/informes/horas?validated=true", headers=admin_headers
+    ).json()
+    assert validated["total_entries"] == 1
+
+
 def test_horas_report_requires_admin(client, worker_headers):
     res = client.get("/api/v1/informes/horas", headers=worker_headers)
     assert res.status_code == 403
