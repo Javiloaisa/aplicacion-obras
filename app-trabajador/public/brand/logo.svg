@@ -1,21 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 292 110" font-family="Arial, Helvetica, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 110" font-family="Arial, Helvetica, sans-serif">
   <title>FENIC Integral</title>
-  <defs>
-    <clipPath id="fenicBadge">
-      <path d="M24,10 L76,10 L92,30 L92,60 L50,98 L8,60 L8,30 Z" />
-    </clipPath>
-  </defs>
-  <g transform="translate(2,6) scale(0.94)">
-    <g clip-path="url(#fenicBadge)">
-      <path fill="#f9b414" d="M10,8 L48,8 L48,28 L29,28 L29,44 L43,44 L43,58 L29,58 L29,98 L10,98 Z" />
-      <g fill="#ffffff">
-        <path d="M54,8 L67,8 L67,98 L54,98 Z" />
-        <path d="M78,8 L91,8 L91,98 L78,98 Z" />
-        <path d="M54,8 L67,8 L91,98 L78,98 Z" />
-      </g>
+  <g transform="translate(2,4) scale(0.92)">
+    <path fill="#f9b414" d="M22,12 L50,12 L50,28 L31,28 L31,44 L45,44 L45,58 L31,58 L31,82 L24,92 L12,82 L12,22 Z" />
+    <g fill="#ffffff">
+      <path d="M58,12 L71,12 L71,92 L58,92 Z" />
+      <path d="M81,12 L90,12 L94,19 L94,85 L89,92 L81,92 Z" />
+      <path d="M58,12 L71,12 L94,92 L81,92 Z" />
     </g>
   </g>
-  <text x="112" y="58" font-size="56" font-weight="bold" letter-spacing="1" fill="#ffffff">FENIC</text>
-  <rect x="114" y="70" width="166" height="5" fill="#f9b414" />
-  <text x="115" y="98" font-size="20" font-weight="bold" letter-spacing="7.5" fill="#ffffff">INTEGRAL</text>
+  <text x="120" y="58" font-size="56" font-weight="bold" letter-spacing="1" fill="#ffffff">FENIC</text>
+  <rect x="122" y="70" width="166" height="5" fill="#f9b414" />
+  <text x="123" y="98" font-size="20" font-weight="bold" letter-spacing="7.5" fill="#ffffff">INTEGRAL</text>
 </svg>
