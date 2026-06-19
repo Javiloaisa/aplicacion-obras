@@ -31,11 +31,11 @@ export default function Login() {
     <div className="flex min-h-screen flex-col justify-center bg-gray-100 p-6">
       <div className="mx-auto w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-4 rounded-2xl bg-ink-800 px-6 py-5 shadow-sm">
+          <div className="mb-4 rounded-2xl bg-white px-6 py-4 shadow-sm">
             <img
-              src="/brand/logo.svg"
+              src="/brand/logo.png"
               alt="FENIC Integral"
-              className="h-10 w-auto"
+              className="h-28 w-auto"
             />
           </div>
           <p className="text-gray-500">Partes de obra · Acceso de trabajadores</p>

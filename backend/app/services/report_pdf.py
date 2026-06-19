@@ -43,23 +43,26 @@ def _hours(value) -> str:
 def _draw_chrome(canvas, doc):
     w, h = A4
     canvas.saveState()
-    # charcoal header band
-    canvas.setFillColor(INK)
+    # light header band with a brand rule underneath
+    canvas.setFillColor(colors.white)
     canvas.rect(0, h - _BAND_H, w, _BAND_H, fill=1, stroke=0)
+    canvas.setStrokeColor(BRAND)
+    canvas.setLineWidth(2)
+    canvas.line(0, h - _BAND_H, w, h - _BAND_H)
     try:
         img = ImageReader(str(_LOGO))
         iw, ih = img.getSize()
-        target_h = 26
+        target_h = 44
         target_w = target_h * iw / ih
         canvas.drawImage(
             img, 40, h - _BAND_H + (_BAND_H - target_h) / 2,
             width=target_w, height=target_h, mask="auto",
         )
     except Exception:
-        canvas.setFillColor(BRAND)
+        canvas.setFillColor(INK)
         canvas.setFont("Helvetica-Bold", 16)
         canvas.drawString(40, h - 40, "FENIC Integral")
-    canvas.setFillColor(BRAND)
+    canvas.setFillColor(INK)
     canvas.setFont("Helvetica-Bold", 13)
     canvas.drawRightString(w - 40, h - 38, "Informe de horas")
     # footer

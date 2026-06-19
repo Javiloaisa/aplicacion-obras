@@ -32,9 +32,11 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-2 w-fit rounded-xl bg-ink-800 px-5 py-3">
-            <img src="/brand/logo.svg" alt="FENIC Integral" className="h-8 w-auto" />
-          </div>
+          <img
+            src="/brand/logo.png"
+            alt="FENIC Integral"
+            className="mx-auto mb-3 h-24 w-auto"
+          />
           <CardTitle className="text-xl">Panel de administración</CardTitle>
           <CardDescription>Partes de obra · FENIC Integral</CardDescription>
         </CardHeader>

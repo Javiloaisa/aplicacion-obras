@@ -30,9 +30,9 @@ export default function Layout({
           </button>
         ) : (
           <img
-            src="/brand/logo.svg"
+            src="/brand/logo.png"
             alt="FENIC Integral"
-            className="h-6 w-auto shrink-0"
+            className="h-10 w-auto shrink-0 rounded-md bg-white p-1"
           />
         )}
         <h1 className="flex-1 truncate text-lg font-semibold">{title}</h1>
