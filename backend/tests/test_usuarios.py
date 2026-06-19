@@ -207,7 +207,7 @@ def test_delete_user_without_history(client, admin_headers):
     assert all(u["username"] != "borrame" for u in listed)
 
 
-def test_delete_user_with_entries_blocked(client, admin_headers, worker_headers, obra):
+def test_delete_user_with_entries_cascades(client, admin_headers, worker_headers, obra):
     client.post(
         f"/api/v1/obras/{obra.id}/entries",
         json={"work_date": "2026-06-09", "hours": 8},
@@ -216,8 +216,14 @@ def test_delete_user_with_entries_blocked(client, admin_headers, worker_headers,
     worker_id = client.get("/api/v1/usuarios", headers=admin_headers).json()
     worker_id = next(u["id"] for u in worker_id if u["username"] == "worker1")
 
+    # The worker can now be deleted even with hours logged; entries go with them
     res = client.delete(f"/api/v1/usuarios/{worker_id}", headers=admin_headers)
-    assert res.status_code == 409
+    assert res.status_code == 204
+
+    listed = client.get("/api/v1/usuarios", headers=admin_headers).json()
+    assert all(u["username"] != "worker1" for u in listed)
+    report = client.get("/api/v1/informes/horas", headers=admin_headers).json()
+    assert report["total_entries"] == 0
 
 
 def test_delete_self_blocked(client, admin_headers, admin):

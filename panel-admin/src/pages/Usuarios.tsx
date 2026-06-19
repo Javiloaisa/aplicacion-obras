@@ -93,7 +93,7 @@ export default function Usuarios() {
   async function deleteUser(user: User) {
     if (
       !window.confirm(
-        `¿Eliminar definitivamente a ${user.full_name}? Esta acción no se puede deshacer.`,
+        `¿Eliminar definitivamente a ${user.full_name}?\n\nSe borrarán también todos sus partes de horas y las fotos/vídeos que haya subido. Esta acción no se puede deshacer.`,
       )
     )
       return;

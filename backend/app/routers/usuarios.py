@@ -3,7 +3,7 @@ import string
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 from app.deps import get_db, require_admin
@@ -16,6 +16,7 @@ from app.schemas.user import (
     UserWithTempPassword,
 )
 from app.security import decrypt_password, set_password
+from app.services import storage
 
 router = APIRouter(prefix="/usuarios", tags=["usuarios"])
 
@@ -148,19 +149,30 @@ def delete_usuario(
             detail="No puedes eliminar tu propia cuenta",
         )
 
-    has_entries = (
-        db.scalar(select(WorkEntry.id).where(WorkEntry.user_id == user.id).limit(1))
-        is not None
-    )
-    has_media = (
-        db.scalar(select(MediaFile.id).where(MediaFile.user_id == user.id).limit(1))
-        is not None
-    )
-    if has_entries or has_media:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="No se puede eliminar: tiene horas o material registrado. Desactívalo en su lugar.",
+    # Deleting a worker also removes their work entries and uploaded media:
+    # user_id is mandatory, so entries/media cannot be left orphaned. We do it
+    # explicitly (instead of relying on the DB ON DELETE CASCADE) so it behaves
+    # the same on SQLite and PostgreSQL, and capture file paths to clean up disk.
+    entry_ids = db.scalars(
+        select(WorkEntry.id).where(WorkEntry.user_id == user.id)
+    ).all()
+    media_paths = db.execute(
+        select(MediaFile.storage_path, MediaFile.thumbnail_path).where(
+            MediaFile.user_id == user.id
         )
+    ).all()
 
+    # Detach any media (even another user's) pointing at this user's entries
+    if entry_ids:
+        db.execute(
+            update(MediaFile)
+            .where(MediaFile.work_entry_id.in_(entry_ids))
+            .values(work_entry_id=None)
+        )
+    db.execute(delete(MediaFile).where(MediaFile.user_id == user.id))
+    db.execute(delete(WorkEntry).where(WorkEntry.user_id == user.id))
     db.delete(user)
     db.commit()
+
+    for storage_path, thumbnail_path in media_paths:
+        storage.delete_media_files(storage_path, thumbnail_path)
