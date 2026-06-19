@@ -7,7 +7,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Nido Constructions brand
+        // FENIC Integral brand
         brand: {
           50: "#fef6e0",
           100: "#fdecc4",

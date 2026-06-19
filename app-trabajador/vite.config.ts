@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["icons/icon-192.png", "icons/icon-512.png"],
       manifest: {
-        name: "Nido · Partes de obra",
-        short_name: "Nido Obras",
-        description: "Partes de horas y fotos de obra — Nido Constructions",
+        name: "FENIC Integral · Partes de obra",
+        short_name: "FENIC Obras",
+        description: "Partes de horas y fotos de obra — FENIC Integral",
         lang: "es",
         display: "standalone",
         start_url: "/",

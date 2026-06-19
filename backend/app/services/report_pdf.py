@@ -1,4 +1,4 @@
-"""Branded PDF of the hours report (Nido Constructions).
+"""Branded PDF of the hours report (FENIC Integral).
 
 Pure-python via reportlab so it needs no system libraries in the container.
 """
@@ -58,7 +58,7 @@ def _draw_chrome(canvas, doc):
     except Exception:
         canvas.setFillColor(BRAND)
         canvas.setFont("Helvetica-Bold", 16)
-        canvas.drawString(40, h - 40, "Nido Constructions")
+        canvas.drawString(40, h - 40, "FENIC Integral")
     canvas.setFillColor(BRAND)
     canvas.setFont("Helvetica-Bold", 13)
     canvas.drawRightString(w - 40, h - 38, "Informe de horas")
@@ -67,7 +67,7 @@ def _draw_chrome(canvas, doc):
     canvas.line(40, 36, w - 40, 36)
     canvas.setFillColor(GREY)
     canvas.setFont("Helvetica", 8)
-    canvas.drawString(40, 24, f"Nido Constructions · generado el {doc._generated}")
+    canvas.drawString(40, 24, f"FENIC Integral · generado el {doc._generated}")
     canvas.drawRightString(w - 40, 24, f"Página {doc.page}")
     canvas.restoreState()
 

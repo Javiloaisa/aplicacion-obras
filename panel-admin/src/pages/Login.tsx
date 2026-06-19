@@ -33,10 +33,10 @@ export default function Login() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <div className="mx-auto mb-2 w-fit rounded-xl bg-ink-800 px-5 py-3">
-            <img src="/brand/logo.png" alt="Nido Constructions" className="h-8 w-auto" />
+            <img src="/brand/logo.svg" alt="FENIC Integral" className="h-8 w-auto" />
           </div>
           <CardTitle className="text-xl">Panel de administración</CardTitle>
-          <CardDescription>Partes de obra · Nido Constructions</CardDescription>
+          <CardDescription>Partes de obra · FENIC Integral</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

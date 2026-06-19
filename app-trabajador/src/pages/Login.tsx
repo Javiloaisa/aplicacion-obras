@@ -33,8 +33,8 @@ export default function Login() {
         <div className="mb-8 flex flex-col items-center text-center">
           <div className="mb-4 rounded-2xl bg-ink-800 px-6 py-5 shadow-sm">
             <img
-              src="/brand/logo.png"
-              alt="Nido Constructions"
+              src="/brand/logo.svg"
+              alt="FENIC Integral"
               className="h-10 w-auto"
             />
           </div>

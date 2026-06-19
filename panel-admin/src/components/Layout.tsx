@@ -28,7 +28,7 @@ export default function Layout({
     <div className="flex min-h-screen">
       <aside className="hidden w-56 shrink-0 flex-col bg-ink-900 text-gray-300 md:flex">
         <div className="flex items-center border-b border-ink-700 p-4">
-          <img src="/brand/logo.png" alt="Nido Constructions" className="h-7 w-auto" />
+          <img src="/brand/logo.svg" alt="FENIC Integral" className="h-7 w-auto" />
         </div>
         <nav className="flex-1 space-y-1 p-3">
           {NAV.map(({ to, label, icon: Icon, end }) => (
@@ -71,8 +71,8 @@ export default function Layout({
         {/* Mobile top nav */}
         <div className="flex items-center gap-2 overflow-x-auto bg-ink-900 p-2 md:hidden">
           <img
-            src="/brand/logo.png"
-            alt="Nido Constructions"
+            src="/brand/logo.svg"
+            alt="FENIC Integral"
             className="h-6 w-auto shrink-0 pl-1 pr-1"
           />
           <nav className="flex items-center gap-1">

@@ -30,8 +30,8 @@ export default function Layout({
           </button>
         ) : (
           <img
-            src="/brand/logo.png"
-            alt="Nido Constructions"
+            src="/brand/logo.svg"
+            alt="FENIC Integral"
             className="h-6 w-auto shrink-0"
           />
         )}
