@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Camera, Check, Download, FileText, Pencil, X } from "lucide-react";
+import { Camera, Check, Download, FileText, MessageSquare, Pencil, X } from "lucide-react";
 import EditEntryForm from "@/components/EditEntryForm";
 import EntryMediaDialog from "@/components/EntryMediaDialog";
 import Layout from "@/components/Layout";
@@ -39,6 +39,7 @@ export default function Informes() {
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<HorasEntryRow | null>(null);
   const [mediaEntry, setMediaEntry] = useState<HorasEntryRow | null>(null);
+  const [noteEntry, setNoteEntry] = useState<HorasEntryRow | null>(null);
 
   useEffect(() => {
     apiGet<Obra[]>("/api/v1/obras").then(setObras).catch(() => {});
@@ -140,29 +141,6 @@ export default function Informes() {
         </div>
       </div>
 
-      {/* Breakdown by trade */}
-      {report && report.by_trade.length > 0 ? (
-        <div className="mb-4 rounded-xl border bg-card">
-          <div className="border-b px-4 py-2 text-sm font-semibold">Por oficio</div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Oficio</TableHead>
-                <TableHead className="text-right">Horas</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {report.by_trade.map((t) => (
-                <TableRow key={t.trade ?? "—"}>
-                  <TableCell>{t.trade || <span className="text-muted-foreground">Sin oficio</span>}</TableCell>
-                  <TableCell className="text-right">{formatHours(t.total_hours)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      ) : null}
-
       <div className="rounded-xl border bg-card">
         <Table>
           <TableHeader>
@@ -170,11 +148,13 @@ export default function Informes() {
               <TableHead>Fecha</TableHead>
               <TableHead>Obra</TableHead>
               <TableHead>Trabajador</TableHead>
-              <TableHead>Oficio</TableHead>
               <TableHead className="text-right">Horas</TableHead>
               <TableHead>Validado</TableHead>
+              <TableHead>Nota</TableHead>
               <TableHead>Fotos</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
+              <TableHead className="sticky right-0 bg-card text-right shadow-[-4px_0_4px_-4px_rgba(0,0,0,0.15)]">
+                Acciones
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -183,7 +163,6 @@ export default function Informes() {
                 <TableCell>{formatDate(entry.work_date)}</TableCell>
                 <TableCell>{entry.obra_name}</TableCell>
                 <TableCell>{entry.user_full_name}</TableCell>
-                <TableCell>{entry.trade || <span className="text-muted-foreground">—</span>}</TableCell>
                 <TableCell className="text-right font-semibold">
                   {formatHours(entry.hours)}
                   {entry.edited_by_admin ? (
@@ -198,6 +177,20 @@ export default function Informes() {
                   )}
                 </TableCell>
                 <TableCell>
+                  {entry.notes ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setNoteEntry(entry)}
+                      title={entry.notes}
+                    >
+                      <MessageSquare />
+                    </Button>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+                <TableCell>
                   <Button
                     variant="outline"
                     size="sm"
@@ -207,7 +200,7 @@ export default function Informes() {
                     <Camera /> {entry.media_count}
                   </Button>
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="sticky right-0 bg-card text-right shadow-[-4px_0_4px_-4px_rgba(0,0,0,0.15)]">
                   {entry.validated ? (
                     <Button variant="ghost" size="icon" onClick={() => toggleValidated(entry.id, false)} title="Quitar validación">
                       <X />
@@ -239,9 +232,9 @@ export default function Informes() {
           {report && report.entries.length > 0 ? (
             <TableFooter>
               <TableRow>
-                <TableCell colSpan={4}>Total</TableCell>
+                <TableCell colSpan={3}>Total</TableCell>
                 <TableCell className="text-right">{formatHours(report.total_hours)}</TableCell>
-                <TableCell colSpan={3}>{report.total_entries} partes</TableCell>
+                <TableCell colSpan={4}>{report.total_entries} partes</TableCell>
               </TableRow>
             </TableFooter>
           ) : null}
@@ -262,6 +255,17 @@ export default function Informes() {
               }}
             />
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={noteEntry !== null} onOpenChange={(open) => !open && setNoteEntry(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Nota — {noteEntry?.user_full_name} ({noteEntry ? formatDate(noteEntry.work_date) : ""})
+            </DialogTitle>
+          </DialogHeader>
+          <p className="whitespace-pre-wrap text-sm">{noteEntry?.notes}</p>
         </DialogContent>
       </Dialog>
 

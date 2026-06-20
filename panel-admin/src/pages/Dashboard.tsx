@@ -99,8 +99,7 @@ export default function Dashboard() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <KpiCard
           label="Pendiente de validar"
-          value={pending ? formatHours(pending.total_hours) : "—"}
-          hint={pending ? `${pending.total_entries} partes sin validar` : undefined}
+          value={pending ? `${pending.total_entries} partes` : "—"}
           to="/informes?from=&to=&validated=false"
           highlight={!!pending && pending.total_entries > 0}
         />

@@ -102,7 +102,7 @@ export default function Historial() {
                   <div className="mt-2">
                     {entry.validated ? (
                       <span className="inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">
-                        ✓ Validado por el jefe
+                        ✓ Validado
                       </span>
                     ) : (
                       <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500">
