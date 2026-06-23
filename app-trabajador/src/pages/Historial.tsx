@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import { EmptyState, ErrorMessage, Spinner } from "../components/ui";
 import { apiGet } from "../lib/api";
 import { formatHours } from "../lib/format";
-import type { EntriesList } from "../lib/types";
+import type { EntriesList, WorkEntry } from "../lib/types";
 
 function toISO(date: Date): string {
   return date.toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
@@ -32,9 +33,14 @@ function formatDate(iso: string): string {
 }
 
 export default function Historial() {
+  const navigate = useNavigate();
   const [period, setPeriod] = useState<"week" | "month">("week");
   const [data, setData] = useState<EntriesList | null>(null);
   const [error, setError] = useState("");
+
+  function editEntry(entry: WorkEntry) {
+    navigate("/historial/editar", { state: { entry } });
+  }
 
   useEffect(() => {
     setData(null);
@@ -99,15 +105,24 @@ export default function Historial() {
                   {entry.notes ? (
                     <div className="mt-1 text-base text-gray-600">{entry.notes}</div>
                   ) : null}
-                  <div className="mt-2">
+                  <div className="mt-2 flex items-center justify-between gap-2">
                     {entry.validated ? (
                       <span className="inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">
                         ✓ Validado
                       </span>
                     ) : (
-                      <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500">
-                        Pendiente de validar
-                      </span>
+                      <>
+                        <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500">
+                          Pendiente de validar
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => editEntry(entry)}
+                          className="min-h-10 rounded-lg border border-gray-300 bg-white px-4 text-base font-semibold text-gray-800 active:bg-gray-100"
+                        >
+                          ✏️ Editar
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>

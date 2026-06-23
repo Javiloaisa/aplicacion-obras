@@ -4,6 +4,7 @@ DATE = "2026-06-09"
 
 
 def utc_naive_days_ago(days: int) -> datetime:
+    """Helper shared with test_media for the media 48h deletion window."""
     return (datetime.now(timezone.utc) - timedelta(days=days)).replace(tzinfo=None)
 
 
@@ -123,7 +124,7 @@ def test_entries_mine_with_totals(client, worker_headers, obra):
     assert res.json()["count"] == 1
 
 
-def test_worker_edits_own_entry_within_48h(client, worker_headers, obra):
+def test_worker_edits_own_pending_entry(client, worker_headers, obra):
     entry = create_entry(client, obra.id, worker_headers).json()
     res = client.patch(
         f"/api/v1/entries/{entry['id']}", json={"hours": 6}, headers=worker_headers
@@ -143,16 +144,32 @@ def test_worker_cannot_edit_others_entry(
     assert res.status_code == 403
 
 
-def test_worker_cannot_edit_entry_after_48h(
-    client, worker_headers, obra, db_session
-):
+def test_worker_can_edit_old_pending_entry(client, worker_headers, obra, db_session):
+    """No time limit anymore: a worker can fix a parte as long as it is not validated."""
     from app.models import WorkEntry
 
     entry_id = create_entry(client, obra.id, worker_headers).json()["id"]
     entry = db_session.get(WorkEntry, __import__("uuid").UUID(entry_id))
-    entry.created_at = utc_naive_days_ago(3)
+    entry.created_at = datetime(2020, 1, 1, 8, 0, 0)
     db_session.add(entry)
     db_session.commit()
+
+    res = client.patch(
+        f"/api/v1/entries/{entry_id}", json={"hours": 6}, headers=worker_headers
+    )
+    assert res.status_code == 200
+    assert float(res.json()["hours"]) == 6.0
+
+
+def test_worker_cannot_modify_validated_entry(
+    client, worker_headers, admin_headers, obra
+):
+    entry_id = create_entry(client, obra.id, worker_headers).json()["id"]
+    client.patch(
+        f"/api/v1/entries/{entry_id}/validate",
+        json={"validated": True},
+        headers=admin_headers,
+    )
 
     res = client.patch(
         f"/api/v1/entries/{entry_id}", json={"hours": 6}, headers=worker_headers

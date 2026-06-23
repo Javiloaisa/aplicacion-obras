@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./lib/auth-context";
 import CambiarPassword from "./pages/CambiarPassword";
+import EditarParte from "./pages/EditarParte";
 import Historial from "./pages/Historial";
 import Login from "./pages/Login";
 import Parte from "./pages/Parte";
@@ -38,6 +39,14 @@ function AppRoutes() {
         element={
           <RequireAuth>
             <Historial />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/historial/editar"
+        element={
+          <RequireAuth>
+            <EditarParte />
           </RequireAuth>
         }
       />

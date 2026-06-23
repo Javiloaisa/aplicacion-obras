@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -21,11 +21,9 @@ from app.schemas.work_entry import (
     WorkEntryUpdate,
     WorkEntryValidate,
 )
-from app.utils import ensure_utc
 
 router = APIRouter(tags=["partes"])
 
-EDIT_WINDOW = timedelta(hours=48)
 MIN_HOURS = Decimal("0.25")
 MAX_HOURS = Decimal("16")
 MAX_DAILY_HOURS = Decimal("24")
@@ -90,11 +88,11 @@ def _can_modify(entry: WorkEntry, user: User) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No puedes modificar partes de otros trabajadores",
         )
-    age = datetime.now(timezone.utc) - ensure_utc(entry.created_at)
-    if age > EDIT_WINDOW:
+    # Workers may freely fix their own partes until the admin validates them.
+    if entry.validated:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Solo puedes modificar un parte durante las 48 horas siguientes",
+            detail="No puedes modificar un parte que el jefe ya ha validado",
         )
 
 

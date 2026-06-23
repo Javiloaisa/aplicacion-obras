@@ -87,7 +87,7 @@ Sistema compuesto por **dos aplicaciones independientes** sobre una **API común
 - `POST /obras/{id}/entries` — worker en sus obras; admin en cualquiera y para cualquier user
 - `GET /obras/{id}/entries` — admin: todos, filtros `user_id`, `from`, `to`; worker: solo los suyos
 - `GET /entries/mine?from=&to=` — historial del trabajador (con totales)
-- `PATCH /entries/{id}` — worker: solo los suyos y dentro de las 48 h tras crearlos; admin: cualquiera (marca `edited_by_admin`); cambiar `obra_id` solo lo puede hacer el admin
+- `PATCH /entries/{id}` — worker: solo los suyos y mientras no estén validados por el admin; admin: cualquiera (marca `edited_by_admin`); cambiar `obra_id` solo lo puede hacer el admin
 - `DELETE /entries/{id}` — mismas reglas que PATCH
 - `PATCH /entries/{id}/validate` (admin) — body `{validated: bool}`; marca/desmarca el parte como validado
 
@@ -117,8 +117,8 @@ Sistema compuesto por **dos aplicaciones independientes** sobre una **API común
 
 ### Pantallas
 1. **Login** (+ cambio de contraseña obligatorio la primera vez). Sesión persistente: no pedir login cada día.
-2. **Parte de horas (pantalla principal)**: desplegable para elegir la obra (si solo tiene una activa, se preselecciona), fecha (hoy por defecto), modo A: hora inicio + hora fin (calcula horas), modo B: campo numérico de horas directo, notas opcionales, fotos/vídeos del trabajo (`<input type="file" accept="image/*,video/*" capture="environment" multiple>`, previsualización, compresión en cliente antes de subir). Debajo del botón "Guardar parte", un botón lleva al Historial.
-3. **Historial**: horas de la semana y del mes con total destacado; cada parte muestra su fecha, obra y si el administrador ya lo ha validado.
+2. **Parte de horas (pantalla principal)**: desplegable para elegir la obra (si solo tiene una activa, se preselecciona), fecha (hoy por defecto), modo A: hora inicio + hora fin (calcula horas), modo B: campo numérico de horas directo, notas opcionales, fotos/vídeos del trabajo con dos opciones —**Cámara** (`capture="environment"`) y **Galería** (sin `capture`, para elegir archivos ya guardados en Android e iOS)—, previsualización, compresión en cliente antes de subir. Debajo del botón "Guardar parte", un botón lleva al Historial.
+3. **Historial**: horas de la semana y del mes con total destacado; cada parte muestra su fecha, obra y si el administrador ya lo ha validado. Mientras un parte siga **pendiente de validar**, el trabajador puede **editarlo o eliminarlo**; una vez validado queda bloqueado.
 
 ### Requisitos PWA
 - `manifest.json` (nombre, iconos 192/512, `display: standalone`), instalable en Android e iOS.
