@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Camera, Check, Download, FileText, MessageSquare, Pencil, X } from "lucide-react";
+import { Camera, Check, Download, FileText, MessageSquare, Pencil, Trash2, X } from "lucide-react";
 import EditEntryForm from "@/components/EditEntryForm";
 import EntryMediaDialog from "@/components/EntryMediaDialog";
 import Layout from "@/components/Layout";
@@ -68,6 +68,12 @@ export default function Informes() {
 
   async function toggleValidated(entryId: string, validated: boolean) {
     await apiSend("PATCH", `/api/v1/entries/${entryId}/validate`, { validated });
+    load();
+  }
+
+  async function deleteEntry(entryId: string) {
+    if (!window.confirm("¿Eliminar este parte definitivamente?")) return;
+    await apiSend("DELETE", `/api/v1/entries/${entryId}`);
     load();
   }
 
@@ -217,6 +223,9 @@ export default function Informes() {
                   )}
                   <Button variant="ghost" size="icon" onClick={() => setEditing(entry)} title="Editar parte">
                     <Pencil />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => deleteEntry(entry.id)} title="Eliminar parte">
+                    <Trash2 className="text-destructive" />
                   </Button>
                 </TableCell>
               </TableRow>
