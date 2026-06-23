@@ -30,7 +30,8 @@ interface Photo {
 
 export default function Parte() {
   const navigate = useNavigate();
-  const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
   const [obras, setObras] = useState<Obra[] | null>(null);
   const [obrasError, setObrasError] = useState("");
   const [obraId, setObraId] = useState("");
@@ -65,17 +66,20 @@ export default function Parte() {
 
   const preview = mode === "times" ? computedHours(startTime, endTime) : null;
 
-  function pickFiles(files: FileList | null) {
-    if (!files) return;
-    const picked: Photo[] = Array.from(files).map((file) => ({
-      file,
-      previewUrl: URL.createObjectURL(file),
-      isVideo: file.type.startsWith("video/"),
-      progress: 0,
-      status: "pending",
-    }));
-    setPhotos((prev) => [...prev, ...picked]);
-    if (fileRef.current) fileRef.current.value = "";
+  function pickFiles(input: HTMLInputElement) {
+    const files = input.files;
+    if (files) {
+      const picked: Photo[] = Array.from(files).map((file) => ({
+        file,
+        previewUrl: URL.createObjectURL(file),
+        isVideo: file.type.startsWith("video/"),
+        progress: 0,
+        status: "pending",
+      }));
+      setPhotos((prev) => [...prev, ...picked]);
+    }
+    // Reset so picking the same file again still fires onChange.
+    input.value = "";
   }
 
   function updatePhoto(index: number, changes: Partial<Photo>) {
@@ -378,23 +382,43 @@ export default function Parte() {
             <p className="text-sm font-medium text-gray-700">
               Fotos/vídeos del trabajo (opcional)
             </p>
+            {/* Camera: opens the camera directly on Android/iOS */}
             <input
-              ref={fileRef}
+              ref={cameraRef}
               type="file"
               accept="image/*,video/*"
               capture="environment"
               multiple
               className="hidden"
-              onChange={(e) => pickFiles(e.target.files)}
+              onChange={(e) => pickFiles(e.target)}
             />
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => fileRef.current?.click()}
-              disabled={busy}
-            >
-              📷 {photos.length === 0 ? "Añadir fotos o vídeos" : "Añadir más"}
-            </Button>
+            {/* Gallery: no `capture`, so the OS shows the photo library / file picker */}
+            <input
+              ref={galleryRef}
+              type="file"
+              accept="image/*,video/*"
+              multiple
+              className="hidden"
+              onChange={(e) => pickFiles(e.target)}
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => cameraRef.current?.click()}
+                disabled={busy}
+              >
+                📷 Cámara
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => galleryRef.current?.click()}
+                disabled={busy}
+              >
+                🖼️ Galería
+              </Button>
+            </div>
             {photos.length > 0 ? (
               <PhotoGrid photos={photos} onRemove={busy ? undefined : removePhoto} />
             ) : null}
