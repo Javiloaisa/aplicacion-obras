@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Bar,
@@ -34,7 +34,7 @@ export default function Dashboard() {
   const wk = thisWeekRange();
   const day = todayISO();
 
-  useEffect(() => {
+  const load = useCallback(() => {
     const lastWk = { from: isoMinus7(wk.from), to: isoMinus7(wk.to) };
     Promise.all([
       apiGet<Obra[]>("/api/v1/obras?status=active"),
@@ -55,8 +55,23 @@ export default function Dashboard() {
       .catch((err) =>
         setError(err instanceof Error ? err.message : "Error al cargar el dashboard"),
       );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [wk.from, wk.to, day]);
+
+  // Load on mount, and refresh whenever the tab regains focus/visibility so the
+  // KPIs (especially "Pendiente de validar") stay in sync while left open.
+  useEffect(() => {
+    load();
+    const onFocus = () => load();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [load]);
 
   const activeToday = today ? new Set(today.rows.map((r) => r.user_id)).size : 0;
 
