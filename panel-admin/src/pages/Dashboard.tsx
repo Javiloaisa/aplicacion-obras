@@ -115,6 +115,7 @@ export default function Dashboard() {
         <KpiCard
           label="Pendiente de validar"
           value={pending ? `${pending.total_entries} partes` : "—"}
+          hint="Histórico completo, no solo este mes"
           to="/informes?from=&to=&validated=false"
           highlight={!!pending && pending.total_entries > 0}
         />
