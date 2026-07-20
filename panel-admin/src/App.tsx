@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
+import Bloqueos from "@/pages/Bloqueos";
 import CambiarPassword from "@/pages/CambiarPassword";
 import Dashboard from "@/pages/Dashboard";
 import Informes from "@/pages/Informes";
@@ -30,6 +31,7 @@ function AppRoutes() {
       <Route path="/obras/:obraId" element={<RequireAuth><ObraDetalle /></RequireAuth>} />
       <Route path="/informes" element={<RequireAuth><Informes /></RequireAuth>} />
       <Route path="/usuarios" element={<RequireAuth><Usuarios /></RequireAuth>} />
+      <Route path="/bloqueos" element={<RequireAuth><Bloqueos /></RequireAuth>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

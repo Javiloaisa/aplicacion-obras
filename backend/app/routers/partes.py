@@ -13,7 +13,7 @@ from app.deps import (
     get_obra_or_404,
     require_admin,
 )
-from app.models import Obra, User, WorkEntry
+from app.models import BlockedDay, Obra, User, WorkEntry
 from app.schemas.work_entry import (
     EntriesListOut,
     WorkEntryCreate,
@@ -80,6 +80,24 @@ def _check_daily_cap(
         )
 
 
+def _check_blocked_day(
+    db: Session, requester: User, user_id: uuid.UUID, work_date: date
+) -> None:
+    """Workers cannot file partes on dates the admin has blocked for them."""
+    if requester.role == "admin":
+        return
+    blocked = db.scalar(
+        select(BlockedDay).where(
+            BlockedDay.user_id == user_id, BlockedDay.blocked_date == work_date
+        )
+    )
+    if blocked is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="El administrador ha bloqueado este día: no puedes registrar partes con esa fecha",
+        )
+
+
 def _can_modify(entry: WorkEntry, user: User) -> None:
     if user.role == "admin":
         return
@@ -124,6 +142,7 @@ def create_entry(
             )
         target_user_id = body.user_id
 
+    _check_blocked_day(db, user, target_user_id, body.work_date)
     hours = _resolve_hours(body.start_time, body.end_time, body.hours)
     _check_daily_cap(db, target_user_id, body.work_date, hours)
 
@@ -235,6 +254,7 @@ def update_entry(
         new_obra = get_obra_or_404(db, data["obra_id"])
         entry.obra_id = new_obra.id
     if "work_date" in data:
+        _check_blocked_day(db, user, entry.user_id, data["work_date"])
         entry.work_date = data["work_date"]
     if "notes" in data:
         entry.notes = data["notes"]

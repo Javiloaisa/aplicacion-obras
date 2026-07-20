@@ -146,6 +146,15 @@ export interface HorasReport {
   total_entries: number;
 }
 
+export interface BlockedDay {
+  id: string;
+  user_id: string;
+  blocked_date: string;
+  note: string | null;
+  created_at: string;
+  user_full_name: string | null;
+}
+
 export interface WorkerHoursRow {
   user_id: string;
   user_full_name: string;

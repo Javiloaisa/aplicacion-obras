@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { BarChart3, Building2, LayoutDashboard, LogOut, Users } from "lucide-react";
+import { BarChart3, Building2, CalendarOff, LayoutDashboard, LogOut, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ const NAV = [
   { to: "/obras", label: "Obras", icon: Building2, end: false },
   { to: "/informes", label: "Informes", icon: BarChart3, end: true },
   { to: "/usuarios", label: "Usuarios", icon: Users, end: true },
+  { to: "/bloqueos", label: "Bloqueos", icon: CalendarOff, end: true },
 ];
 
 export default function Layout({
