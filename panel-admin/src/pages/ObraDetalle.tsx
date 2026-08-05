@@ -3,10 +3,19 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import GaleriaTab from "@/components/obra/GaleriaTab";
 import HorasTab from "@/components/obra/HorasTab";
+import ObraForm from "@/components/obra/ObraForm";
 import Layout from "@/components/Layout";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { TabsBar } from "@/components/ui/tabs";
 import { apiGet } from "@/lib/api";
+import { toggleObraStatus } from "@/lib/obras";
 import type { ObraDetail, User } from "@/lib/types";
 
 type Tab = "galeria" | "horas";
@@ -18,6 +27,7 @@ export default function ObraDetalle() {
   const [obra, setObra] = useState<ObraDetail | null>(null);
   const [workers, setWorkers] = useState<User[]>([]);
   const [error, setError] = useState("");
+  const [editOpen, setEditOpen] = useState(false);
 
   const loadObra = useCallback(() => {
     apiGet<ObraDetail>(`/api/v1/obras/${obraId}`)
@@ -35,16 +45,38 @@ export default function ObraDetalle() {
       .catch(() => {});
   }, [obraId, loadObra]);
 
+  async function archive() {
+    if (!obra) return;
+    setError("");
+    try {
+      if (await toggleObraStatus(obra)) loadObra();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo cambiar el estado");
+    }
+  }
+
   return (
     <Layout
       title={obra?.name ?? "Obra"}
       actions={
-        <Link
-          to="/obras"
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" /> Volver a obras
-        </Link>
+        <div className="flex items-center gap-3">
+          {obra ? (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                Editar
+              </Button>
+              <Button variant="outline" size="sm" onClick={archive}>
+                {obra.status === "active" ? "Archivar" : "Reactivar"}
+              </Button>
+            </>
+          ) : null}
+          <Link
+            to="/obras"
+            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" /> Volver a obras
+          </Link>
+        </div>
       }
     >
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
@@ -77,6 +109,23 @@ export default function ObraDetalle() {
           {tab === "horas" ? <HorasTab obraId={obraId} workers={workers} /> : null}
         </>
       ) : null}
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar obra</DialogTitle>
+          </DialogHeader>
+          {obra ? (
+            <ObraForm
+              obra={obra}
+              onSaved={() => {
+                setEditOpen(false);
+                loadObra();
+              }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
