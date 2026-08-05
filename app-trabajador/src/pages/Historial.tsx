@@ -10,7 +10,9 @@ function toISO(date: Date): string {
   return date.toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
 }
 
-function rangeFor(period: "week" | "month"): { from: string; to: string } {
+type Period = "week" | "month" | "last_month";
+
+function rangeFor(period: Period): { from: string; to: string } {
   const now = new Date();
   const to = toISO(now);
   if (period === "week") {
@@ -20,8 +22,14 @@ function rangeFor(period: "week" | "month"): { from: string; to: string } {
     monday.setDate(now.getDate() - (day - 1));
     return { from: toISO(monday), to };
   }
-  const first = new Date(now.getFullYear(), now.getMonth(), 1);
-  return { from: toISO(first), to };
+  if (period === "month") {
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { from: toISO(first), to };
+  }
+  // Previous month, whole month: day 0 of this month is its last day
+  const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const last = new Date(now.getFullYear(), now.getMonth(), 0);
+  return { from: toISO(first), to: toISO(last) };
 }
 
 function formatDate(iso: string): string {
@@ -34,7 +42,7 @@ function formatDate(iso: string): string {
 
 export default function Historial() {
   const navigate = useNavigate();
-  const [period, setPeriod] = useState<"week" | "month">("week");
+  const [period, setPeriod] = useState<Period>("week");
   const [data, setData] = useState<EntriesList | null>(null);
   const [error, setError] = useState("");
 
@@ -55,18 +63,19 @@ export default function Historial() {
 
   return (
     <Layout title="Mis horas" back="/">
-      <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl bg-gray-200 p-1">
+      <div className="mb-4 grid grid-cols-3 gap-2 rounded-xl bg-gray-200 p-1">
         {(
           [
             ["week", "Esta semana"],
             ["month", "Este mes"],
+            ["last_month", "Mes pasado"],
           ] as const
         ).map(([value, label]) => (
           <button
             key={value}
             type="button"
             onClick={() => setPeriod(value)}
-            className={`min-h-12 rounded-lg text-base font-semibold ${
+            className={`min-h-12 rounded-lg px-1 text-sm font-semibold ${
               period === value ? "bg-white text-gray-900 shadow" : "text-gray-600"
             }`}
           >
