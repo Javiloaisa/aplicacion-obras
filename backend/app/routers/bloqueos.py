@@ -2,7 +2,7 @@ import uuid
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import delete as sql_delete, select
 from sqlalchemy.orm import Session
 
 from app.deps import get_db, require_admin
@@ -43,7 +43,10 @@ def create_bloqueos(
     _admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    """Block one date for several workers at once. Already-blocked pairs are skipped."""
+    """Block one or more dates for several workers at once.
+
+    Already-blocked (worker, date) pairs are skipped.
+    """
     users = db.scalars(select(User).where(User.id.in_(body.user_ids))).all()
     if len(users) != len(set(body.user_ids)):
         raise HTTPException(
@@ -51,27 +54,40 @@ def create_bloqueos(
             detail="Alguno de los trabajadores no existe",
         )
 
+    dates = body.dates
     already_blocked = set(
-        db.scalars(
-            select(BlockedDay.user_id).where(
-                BlockedDay.blocked_date == body.blocked_date,
+        db.execute(
+            select(BlockedDay.user_id, BlockedDay.blocked_date).where(
+                BlockedDay.blocked_date.in_(dates),
                 BlockedDay.user_id.in_(body.user_ids),
             )
-        )
+        ).all()
     )
 
     created: list[BlockedDayOut] = []
-    for user in users:
-        if user.id in already_blocked:
-            continue
-        blocked = BlockedDay(
-            user_id=user.id, blocked_date=body.blocked_date, note=body.note
-        )
-        db.add(blocked)
-        db.flush()
-        created.append(_bloqueo_out(blocked, user.full_name))
+    for blocked_date in dates:
+        for user in users:
+            if (user.id, blocked_date) in already_blocked:
+                continue
+            blocked = BlockedDay(
+                user_id=user.id, blocked_date=blocked_date, note=body.note
+            )
+            db.add(blocked)
+            db.flush()
+            created.append(_bloqueo_out(blocked, user.full_name))
     db.commit()
     return created
+
+
+@router.delete("", status_code=status.HTTP_204_NO_CONTENT)
+def delete_bloqueos_by_date(
+    blocked_date: date = Query(..., alias="date"),
+    _admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Unblock a whole date for every worker blocked on it."""
+    db.execute(sql_delete(BlockedDay).where(BlockedDay.blocked_date == blocked_date))
+    db.commit()
 
 
 @router.delete("/{bloqueo_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 DATE = "2026-07-19"
 OTHER_DATE = "2026-07-18"
 
@@ -46,11 +48,104 @@ def test_blocking_twice_skips_existing(client, admin_headers, worker):
     assert len(client.get("/api/v1/bloqueos", headers=admin_headers).json()) == 1
 
 
+def test_admin_blocks_several_dates_at_once(client, admin_headers, worker, worker2):
+    dates = ["2026-08-02", "2026-08-09", "2026-08-16"]
+    res = client.post(
+        "/api/v1/bloqueos",
+        json={
+            "blocked_dates": dates,
+            "user_ids": [str(worker.id), str(worker2.id)],
+            "note": "domingos",
+        },
+        headers=admin_headers,
+    )
+    assert res.status_code == 201
+    data = res.json()
+    assert len(data) == 6
+    assert {row["blocked_date"] for row in data} == set(dates)
+
+    listed = client.get("/api/v1/bloqueos", headers=admin_headers).json()
+    assert len(listed) == 6
+
+
+def test_multiple_dates_skip_only_existing_pairs(client, admin_headers, worker):
+    assert block(client, admin_headers, [str(worker.id)], blocked_date=DATE).status_code == 201
+    res = client.post(
+        "/api/v1/bloqueos",
+        json={"blocked_dates": [DATE, OTHER_DATE], "user_ids": [str(worker.id)]},
+        headers=admin_headers,
+    )
+    assert res.status_code == 201
+    data = res.json()
+    assert [row["blocked_date"] for row in data] == [OTHER_DATE]
+    assert len(client.get("/api/v1/bloqueos", headers=admin_headers).json()) == 2
+
+
+def test_block_without_any_date_rejected(client, admin_headers, worker):
+    res = client.post(
+        "/api/v1/bloqueos",
+        json={"user_ids": [str(worker.id)]},
+        headers=admin_headers,
+    )
+    assert res.status_code == 422
+
+
+def test_too_many_dates_rejected(client, admin_headers, worker):
+    start = date(2026, 1, 1)
+    dates = [(start + timedelta(days=i)).isoformat() for i in range(400)]
+    res = client.post(
+        "/api/v1/bloqueos",
+        json={"blocked_dates": dates, "user_ids": [str(worker.id)]},
+        headers=admin_headers,
+    )
+    assert res.status_code == 422
+
+
+def test_worker_cannot_create_entry_on_bulk_blocked_day(
+    client, admin_headers, worker_headers, worker, obra
+):
+    client.post(
+        "/api/v1/bloqueos",
+        json={"blocked_dates": [OTHER_DATE, DATE], "user_ids": [str(worker.id)]},
+        headers=admin_headers,
+    )
+    assert create_entry(client, obra.id, worker_headers).status_code == 403
+
+
 def test_block_unknown_user_rejected(client, admin_headers):
     res = block(
         client, admin_headers, ["00000000-0000-0000-0000-000000000000"]
     )
     assert res.status_code == 404
+
+
+def test_admin_deletes_a_whole_date(client, admin_headers, worker, worker2):
+    block(client, admin_headers, [str(worker.id), str(worker2.id)], blocked_date=DATE)
+    block(client, admin_headers, [str(worker.id)], blocked_date=OTHER_DATE)
+
+    res = client.delete(f"/api/v1/bloqueos?date={DATE}", headers=admin_headers)
+    assert res.status_code == 204
+
+    listed = client.get("/api/v1/bloqueos", headers=admin_headers).json()
+    assert [row["blocked_date"] for row in listed] == [OTHER_DATE]
+
+
+def test_delete_whole_date_requires_admin(client, worker_headers):
+    res = client.delete(f"/api/v1/bloqueos?date={DATE}", headers=worker_headers)
+    assert res.status_code == 403
+
+
+def test_delete_whole_date_lets_workers_post_again(
+    client, admin_headers, worker_headers, worker, obra
+):
+    block(client, admin_headers, [str(worker.id)])
+    assert create_entry(client, obra.id, worker_headers).status_code == 403
+
+    assert (
+        client.delete(f"/api/v1/bloqueos?date={DATE}", headers=admin_headers).status_code
+        == 204
+    )
+    assert create_entry(client, obra.id, worker_headers).status_code == 201
 
 
 def test_worker_cannot_create_entry_on_blocked_day(
