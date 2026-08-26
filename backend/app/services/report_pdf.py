@@ -3,6 +3,7 @@
 Pure-python via reportlab so it needs no system libraries in the container.
 """
 import io
+from decimal import Decimal
 from pathlib import Path
 
 from reportlab.lib import colors
@@ -34,10 +35,18 @@ _BAND_H = 64
 _title = ParagraphStyle("title", fontName="Helvetica-Bold", fontSize=16, textColor=INK, spaceAfter=2)
 _sub = ParagraphStyle("sub", fontName="Helvetica", fontSize=10, textColor=GREY, spaceAfter=10)
 _h2 = ParagraphStyle("h2", fontName="Helvetica-Bold", fontSize=11, textColor=INK, spaceBefore=10, spaceAfter=4)
+_h3 = ParagraphStyle("h3", fontName="Helvetica-Bold", fontSize=10, textColor=INK, spaceBefore=12, spaceAfter=3)
+# Notes can be long, so detail cells wrap instead of overflowing the column.
+_cell = ParagraphStyle("cell", fontName="Helvetica", fontSize=8, textColor=INK, leading=10)
 
 
 def _hours(value) -> str:
     return hours_hm(value)
+
+
+def _esc(text: str) -> str:
+    """Notes are free text typed by workers; keep reportlab's mini-HTML out."""
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def _draw_chrome(canvas, doc):
@@ -132,8 +141,8 @@ def build_horas_pdf(
         tt.setStyle(_table_style())
         story.append(tt)
 
-    # Detail
-    story.append(Paragraph("Detalle por obra y trabajador", _h2))
+    # Totals per obra and worker
+    story.append(Paragraph("Resumen por obra y trabajador", _h2))
     head = ["Obra", "Trabajador", "Oficio", "Partes", "Horas"]
     rows = [head]
     for r in data.rows:
@@ -150,8 +159,86 @@ def build_horas_pdf(
     dt.setStyle(_table_style(total=True))
     story.append(dt)
 
+    _append_day_detail(story, data, width=w - 80, show_obra=obra_label is None)
+
     doc.build(story)
     return buf.getvalue()
+
+
+def _append_day_detail(story, data: HorasReportOut, *, width: float, show_obra: bool) -> None:
+    """Day-by-day rows grouped by worker, with the notes each parte carries."""
+    if not data.entries:
+        return
+
+    story.append(Paragraph("Detalle por día", _h2))
+
+    by_worker: dict[str, list] = {}
+    trades: dict[str, str | None] = {}
+    for e in data.entries:
+        by_worker.setdefault(e.user_full_name, []).append(e)
+        trades.setdefault(e.user_full_name, e.trade)
+
+    for name in sorted(by_worker, key=str.lower):
+        entries = sorted(by_worker[name], key=lambda e: e.work_date)
+        trade = trades.get(name)
+        story.append(Paragraph(f"{name}{f' · {trade}' if trade else ''}", _h3))
+
+        head = ["Fecha", "Obra", "Horas", "Validado", "Notas"] if show_obra else [
+            "Fecha", "Horas", "Validado", "Notas"
+        ]
+        rows = [head]
+        for e in entries:
+            note = Paragraph(_esc(e.notes), _cell) if e.notes else "—"
+            validated = "Sí" if e.validated else "Pendiente"
+            hours = _hours(e.hours) + (" *" if e.edited_by_admin else "")
+            rows.append(
+                [e.work_date.strftime("%d/%m/%Y"), e.obra_name, hours, validated, note]
+                if show_obra
+                else [e.work_date.strftime("%d/%m/%Y"), hours, validated, note]
+            )
+
+        subtotal = sum((e.hours for e in entries), Decimal("0"))
+        count = len(entries)
+        label = f"Total {name} · {count} {'parte' if count == 1 else 'partes'}"
+        rows.append(
+            [label, "", _hours(subtotal), "", ""] if show_obra else [label, _hours(subtotal), "", ""]
+        )
+
+        widths = (
+            [62, 120, 52, 55, width - 289]
+            if show_obra
+            else [70, 60, 60, width - 190]
+        )
+        table = LongTable(rows, colWidths=widths, repeatRows=1)
+        table.setStyle(_detail_style(hours_col=2 if show_obra else 1))
+        story.append(table)
+
+    if any(e.edited_by_admin for e in data.entries):
+        story.append(
+            Paragraph("* Horas editadas por el administrador.", _sub)
+        )
+
+
+def _detail_style(*, hours_col: int) -> TableStyle:
+    return TableStyle([
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, 0), 8),
+        ("BACKGROUND", (0, 0), (-1, 0), INK),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 1), (-1, -1), 8),
+        ("TEXTCOLOR", (0, 1), (-1, -1), INK),
+        ("ALIGN", (hours_col, 0), (hours_col, -1), "RIGHT"),
+        ("VALIGN", (0, 1), (-1, -1), "TOP"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, LIGHT]),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.5, LINE),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+        ("BACKGROUND", (0, -1), (-1, -1), BRAND),
+        ("TEXTCOLOR", (0, -1), (-1, -1), INK),
+    ])
 
 
 def _table_style(total: bool = False) -> TableStyle:
