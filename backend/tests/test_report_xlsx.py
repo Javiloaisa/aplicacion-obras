@@ -44,12 +44,13 @@ def report(entries) -> HorasReportOut:
     )
 
 
-def build(entries):
+def build(entries, *, data_only=False):
+    """data_only=True reads the stored formula results, as a viewer that doesn't recalculate would."""
     content = build_horas_xlsx(
         report(entries), period="01/08/2026 – 31/08/2026",
         obra_label=None, worker_label=None, generated="10/09/2026 09:00",
     )
-    return load_workbook(io.BytesIO(content))
+    return load_workbook(io.BytesIO(content), data_only=data_only)
 
 
 def values(ws) -> list[list]:
@@ -118,6 +119,31 @@ def test_summary_totals_are_formulas_over_the_detail():
     total = header + 3
     assert ws[f"A{total}"].value == "TOTAL"
     assert ws[f"D{total}"].value == f"=SUM(D{header + 1}:D{header + 2})"
+
+
+def test_formulas_store_their_result_for_viewers_that_do_not_recalculate():
+    wb = build([
+        entry(ANA, "Ana", date(2026, 8, 3), "8"),
+        entry(ANA, "Ana", date(2026, 8, 4), "4", obra_id=OBRA_B, obra="Nave"),
+        entry(LUIS, "Luis", date(2026, 8, 5), "6.5", trade="Electricista"),
+    ], data_only=True)
+    ws = wb["Resumen"]
+
+    assert ws["B5"].value == timedelta(hours=18, minutes=30)
+    assert ws["B6"].value == 3
+
+    r = find_row(ws, "Obra Centro")
+    assert ws[f"D{r}"].value == 1
+    assert ws[f"E{r}"].value == timedelta(hours=8)
+    assert ws[f"B{find_row(ws, 'Electricista')}"].value == timedelta(hours=6, minutes=30)
+    assert ws[f"B{find_row(ws, 'Fontanero')}"].value == timedelta(hours=12)
+
+    header = find_row(ws, "Trabajador")
+    assert ws[f"D{header + 1}"].value == timedelta(hours=12)  # Ana, both obras
+    totals = [c.row for c in ws["A"] if c.value == "TOTAL"]
+    assert len(totals) == 2
+    for t in totals:
+        assert timedelta(hours=18, minutes=30) in (ws[f"D{t}"].value, ws[f"E{t}"].value)
 
 
 def test_text_that_looks_like_a_formula_stays_text():

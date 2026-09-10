@@ -14,7 +14,8 @@ slowapi==0.1.9
 Pillow==11.0.0
 pillow-heif>=0.18,<2
 reportlab==4.2.5
-openpyxl==3.1.5
+XlsxWriter==3.2.0
+openpyxl==3.1.5  # tests: read the exported workbook back
 tzdata>=2024.1
 pytest==8.3.4
 httpx==0.28.1
