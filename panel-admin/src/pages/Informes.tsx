@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Camera, Check, Download, FileText, MessageSquare, Pencil, Trash2, X } from "lucide-react";
+import { Camera, Check, Download, FileSpreadsheet, FileText, MessageSquare, Pencil, Trash2, X } from "lucide-react";
 import EditEntryForm from "@/components/EditEntryForm";
 import EntryMediaDialog from "@/components/EntryMediaDialog";
 import Layout from "@/components/Layout";
@@ -86,6 +86,12 @@ export default function Informes() {
             onClick={() => apiDownload(`/api/v1/informes/horas/export.pdf?${buildParams()}`, "informe_horas.pdf")}
           >
             <FileText /> Informe PDF
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => apiDownload(`/api/v1/informes/horas/export.xlsx?${buildParams()}`, "informe_horas.xlsx")}
+          >
+            <FileSpreadsheet /> Excel
           </Button>
           <Button
             variant="outline"

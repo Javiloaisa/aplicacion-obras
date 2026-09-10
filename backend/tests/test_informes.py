@@ -144,6 +144,32 @@ def test_pdf_export_requires_admin(client, worker_headers):
     assert res.status_code == 403
 
 
+def test_xlsx_export(client, admin_headers, obra, other_obra, worker, worker2):
+    import io
+
+    from openpyxl import load_workbook
+
+    seed_entries(client, admin_headers, obra, other_obra, worker, worker2)
+    res = client.get(
+        f"/api/v1/informes/horas/export.xlsx?obra_id={obra.id}&from=2026-06-01",
+        headers=admin_headers,
+    )
+    assert res.status_code == 200
+    assert res.headers["content-type"] == (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    assert 'filename="informe_horas_2026-06-01.xlsx"' in res.headers["content-disposition"]
+
+    detail = load_workbook(io.BytesIO(res.content))["Detalle"]
+    assert detail.max_row == 4  # header + 3 entries in this obra
+    assert "Nave Industrial" not in {c.value for c in detail["B"]}
+
+
+def test_xlsx_export_requires_admin(client, worker_headers):
+    res = client.get("/api/v1/informes/horas/export.xlsx", headers=worker_headers)
+    assert res.status_code == 403
+
+
 def test_obra_resumen(client, admin_headers, obra, other_obra, worker, worker2):
     seed_entries(client, admin_headers, obra, other_obra, worker, worker2)
 

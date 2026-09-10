@@ -2,6 +2,11 @@
 from decimal import ROUND_HALF_UP, Decimal
 
 
+def hours_to_minutes(value) -> int:
+    """Decimal hours (e.g. 8.63) -> whole minutes (518), rounding half up."""
+    return int((Decimal(str(value)) * 60).to_integral_value(rounding=ROUND_HALF_UP))
+
+
 def hours_hm(value) -> str:
     """Decimal hours (e.g. 8.63) -> '8h 38m'. Minutes padded to 2 digits.
 
@@ -9,6 +14,5 @@ def hours_hm(value) -> str:
     """
     if value is None:
         return "—"
-    total_minutes = int((Decimal(str(value)) * 60).to_integral_value(rounding=ROUND_HALF_UP))
-    h, m = divmod(total_minutes, 60)
+    h, m = divmod(hours_to_minutes(value), 60)
     return f"{h}h {m:02d}m"

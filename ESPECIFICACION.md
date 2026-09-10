@@ -102,6 +102,8 @@ Sistema compuesto por **dos aplicaciones independientes** sobre una **API común
 ### Informes (admin)
 - `GET /informes/horas?from=&to=&obra_id=&user_id=` — agregado por obra → trabajador (total horas y nº de partes) y listado de partes individuales (`entries`) con fecha y estado `validated`
 - `GET /informes/horas/export.csv?...` — CSV: obra, trabajador, fecha, inicio, fin, horas, validado, notas
+- `GET /informes/horas/export.pdf?...` — PDF con marca: totales, por oficio, por obra y trabajador, detalle por día
+- `GET /informes/horas/export.xlsx?...` — Excel editable (Excel/Google Sheets): hoja "Resumen" con totales como fórmulas sobre la hoja "Detalle" (un parte por fila, horas como duración `[h]:mm`)
 - `GET /informes/obra/{id}/resumen` — totales de la obra: horas por trabajador, nº fotos/vídeos, primer y último parte
 
 ### Usuarios (admin)
@@ -138,7 +140,7 @@ Aplicación web clásica (NO PWA), optimizada para escritorio, responsive para p
    - **Galería**: grid de miniaturas, filtros por trabajador/fecha/tipo, lightbox con reproductor de vídeo, descargar original, eliminar, ver caption y autor/fecha.
    - **Horas**: tabla de partes con filtros por trabajador y rango de fechas, totales por trabajador, editar (incluida la obra, por si el trabajador se equivocó al elegirla)/eliminar partes, validar/invalidar, botón "Exportar CSV".
    - **Trabajadores**: asignar/desasignar (multi-select con búsqueda).
-5. **Informes**: rango de fechas + filtros obra/trabajador, listado de partes individuales con fecha y estado de validación, totales y desglose por oficio, exportar CSV/PDF.
+5. **Informes**: rango de fechas + filtros obra/trabajador, listado de partes individuales con fecha y estado de validación, totales y desglose por oficio, exportar CSV/PDF/Excel.
 6. **Usuarios**: alta de trabajador (muestra contraseña temporal una sola vez), activar/desactivar, reset de contraseña aleatoria o fijar una contraseña propia, eliminar (bloqueado si tiene horas o media registrados).
 
 ## 7. Seguridad

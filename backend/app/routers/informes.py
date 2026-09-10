@@ -3,6 +3,7 @@ import io
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import func, select
@@ -146,6 +147,26 @@ def horas_report(
     return _horas_report_data(db, obra_id, user_id, from_date, to_date, validated)
 
 
+def _export_filename(base: str, from_date: date | None, to_date: date | None, ext: str) -> str:
+    if from_date is not None:
+        base += f"_{from_date.isoformat()}"
+    if to_date is not None:
+        base += f"_{to_date.isoformat()}"
+    return f"{base}.{ext}"
+
+
+def _report_labels(db, obra_id, user_id, from_date, to_date) -> dict:
+    """Header texts shared by the PDF and the spreadsheet."""
+    obra = db.get(Obra, obra_id) if obra_id else None
+    worker = db.get(User, user_id) if user_id else None
+    return {
+        "period": _period_label(from_date, to_date),
+        "obra_label": obra.name if obra else None,
+        "worker_label": worker.full_name if worker else None,
+        "generated": datetime.now(ZoneInfo("Europe/Madrid")).strftime("%d/%m/%Y %H:%M"),
+    }
+
+
 @router.get("/horas/export.pdf")
 def horas_export_pdf(
     obra_id: uuid.UUID | None = None,
@@ -156,31 +177,37 @@ def horas_export_pdf(
     _admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    from zoneinfo import ZoneInfo
-
     from app.services.report_pdf import build_horas_pdf
 
     data = _horas_report_data(db, obra_id, user_id, from_date, to_date, validated)
-    obra = db.get(Obra, obra_id) if obra_id else None
-    worker = db.get(User, user_id) if user_id else None
-    generated = datetime.now(ZoneInfo("Europe/Madrid")).strftime("%d/%m/%Y %H:%M")
-
-    pdf = build_horas_pdf(
-        data,
-        period=_period_label(from_date, to_date),
-        obra_label=obra.name if obra else None,
-        worker_label=worker.full_name if worker else None,
-        generated=generated,
-    )
-    filename = "informe_horas"
-    if from_date is not None:
-        filename += f"_{from_date.isoformat()}"
-    if to_date is not None:
-        filename += f"_{to_date.isoformat()}"
+    pdf = build_horas_pdf(data, **_report_labels(db, obra_id, user_id, from_date, to_date))
+    filename = _export_filename("informe_horas", from_date, to_date, "pdf")
     return Response(
         content=pdf,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}.pdf"'},
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/horas/export.xlsx")
+def horas_export_xlsx(
+    obra_id: uuid.UUID | None = None,
+    user_id: uuid.UUID | None = None,
+    from_date: date | None = Query(None, alias="from"),
+    to_date: date | None = Query(None, alias="to"),
+    validated: bool | None = None,
+    _admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    from app.services.report_xlsx import build_horas_xlsx
+
+    data = _horas_report_data(db, obra_id, user_id, from_date, to_date, validated)
+    xlsx = build_horas_xlsx(data, **_report_labels(db, obra_id, user_id, from_date, to_date))
+    filename = _export_filename("informe_horas", from_date, to_date, "xlsx")
+    return Response(
+        content=xlsx,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -222,16 +249,12 @@ def horas_export_csv(
             ]
         )
 
-    filename = "horas"
-    if from_date is not None:
-        filename += f"_{from_date.isoformat()}"
-    if to_date is not None:
-        filename += f"_{to_date.isoformat()}"
+    filename = _export_filename("horas", from_date, to_date, "csv")
     # BOM so Excel (es-ES) opens the UTF-8 file with accents intact
     return Response(
         content="﻿" + buffer.getvalue(),
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{filename}.csv"'},
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
