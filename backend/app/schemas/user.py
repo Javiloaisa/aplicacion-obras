@@ -34,6 +34,8 @@ class UserOut(BaseModel):
     is_active: bool
     must_change_password: bool
     created_at: datetime
+    empresa_id: uuid.UUID | None = None
+    acceso_todas_empresas: bool = False
 
 
 class UserCreate(BaseModel):
@@ -43,6 +45,8 @@ class UserCreate(BaseModel):
     phone: str | None = Field(None, max_length=30)
     trade: str | None = Field(None, max_length=50)
     role: Literal["admin", "worker"] = "worker"
+    # Mandatory for every new user: "todas" is only valid together with role=admin
+    empresa: Literal["nido", "fega", "todas"]
 
 
 class UserUpdate(BaseModel):

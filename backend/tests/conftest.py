@@ -150,6 +150,64 @@ def empresa_fega(db_session) -> Empresa:
     return e
 
 
+@pytest.fixture
+def worker_nido(db_session, empresa_nido) -> User:
+    user = User(
+        username="worker-nido",
+        full_name="Trabajador Nido",
+        password_hash=_WORKER_HASH,
+        role="worker",
+        empresa_id=empresa_nido.id,
+    )
+    db_session.add(user)
+    db_session.commit()
+    return user
+
+
+@pytest.fixture
+def worker_fega(db_session, empresa_fega) -> User:
+    user = User(
+        username="worker-fega",
+        full_name="Trabajador Fega",
+        password_hash=_WORKER_HASH,
+        role="worker",
+        empresa_id=empresa_fega.id,
+    )
+    db_session.add(user)
+    db_session.commit()
+    return user
+
+
+@pytest.fixture
+def admin_nido(db_session, empresa_nido) -> User:
+    user = User(
+        username="admin-nido",
+        full_name="Admin Nido",
+        password_hash=_ADMIN_HASH,
+        role="admin",
+        must_change_password=False,
+        empresa_id=empresa_nido.id,
+    )
+    db_session.add(user)
+    db_session.commit()
+    return user
+
+
+@pytest.fixture
+def admin_fega(db_session, empresa_fega) -> User:
+    user = User(
+        username="admin-fega",
+        full_name="Admin Fega",
+        password_hash=_ADMIN_HASH,
+        role="admin",
+        must_change_password=False,
+        empresa_id=empresa_fega.id,
+    )
+    db_session.add(user)
+    db_session.commit()
+    return user
+
+
 def auth_headers(user: User) -> dict[str, str]:
     return {"Authorization": f"Bearer {create_access_token(user.id)}"}
 
@@ -167,3 +225,23 @@ def worker2_headers(worker2):
 @pytest.fixture
 def admin_headers(admin):
     return auth_headers(admin)
+
+
+@pytest.fixture
+def worker_nido_headers(worker_nido):
+    return auth_headers(worker_nido)
+
+
+@pytest.fixture
+def worker_fega_headers(worker_fega):
+    return auth_headers(worker_fega)
+
+
+@pytest.fixture
+def admin_nido_headers(admin_nido):
+    return auth_headers(admin_nido)
+
+
+@pytest.fixture
+def admin_fega_headers(admin_fega):
+    return auth_headers(admin_fega)

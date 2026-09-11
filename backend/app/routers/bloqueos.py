@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import delete as sql_delete, select
 from sqlalchemy.orm import Session
 
-from app.deps import get_db, require_admin
+from app.deps import EmpresaScope, get_db, require_admin, scope_empresa
 from app.models import BlockedDay, User
 from app.schemas.blocked_day import BlockedDayOut, BlockedDaysCreate
 
@@ -18,6 +18,7 @@ def list_bloqueos(
     from_date: date | None = Query(None, alias="from"),
     to_date: date | None = Query(None, alias="to"),
     _admin: User = Depends(require_admin),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
     stmt = (
@@ -25,6 +26,7 @@ def list_bloqueos(
         .join(User, User.id == BlockedDay.user_id)
         .order_by(BlockedDay.blocked_date.desc(), User.full_name)
     )
+    stmt = scope.apply(stmt, User.empresa_id)
     if user_id is not None:
         stmt = stmt.where(BlockedDay.user_id == user_id)
     if from_date is not None:
@@ -41,6 +43,7 @@ def list_bloqueos(
 def create_bloqueos(
     body: BlockedDaysCreate,
     _admin: User = Depends(require_admin),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
     """Block one or more dates for several workers at once.
@@ -48,7 +51,9 @@ def create_bloqueos(
     Already-blocked (worker, date) pairs are skipped.
     """
     users = db.scalars(select(User).where(User.id.in_(body.user_ids))).all()
-    if len(users) != len(set(body.user_ids)):
+    if len(users) != len(set(body.user_ids)) or any(
+        not scope.allows_empresa_id(u.empresa_id) for u in users
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Alguno de los trabajadores no existe",
@@ -83,21 +88,36 @@ def create_bloqueos(
 def delete_bloqueos_by_date(
     blocked_date: date = Query(..., alias="date"),
     _admin: User = Depends(require_admin),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
-    """Unblock a whole date for every worker blocked on it."""
-    db.execute(sql_delete(BlockedDay).where(BlockedDay.blocked_date == blocked_date))
-    db.commit()
+    """Unblock a whole date for every worker in scope blocked on it."""
+    stmt = select(BlockedDay.id).where(BlockedDay.blocked_date == blocked_date)
+    if not scope.unrestricted:
+        stmt = (
+            stmt.join(User, User.id == BlockedDay.user_id)
+        )
+        stmt = scope.apply(stmt, User.empresa_id)
+    ids = db.scalars(stmt).all()
+    if ids:
+        db.execute(sql_delete(BlockedDay).where(BlockedDay.id.in_(ids)))
+        db.commit()
 
 
 @router.delete("/{bloqueo_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_bloqueo(
     bloqueo_id: uuid.UUID,
     _admin: User = Depends(require_admin),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
     blocked = db.get(BlockedDay, bloqueo_id)
     if blocked is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Bloqueo no encontrado"
+        )
+    target_user = db.get(User, blocked.user_id)
+    if target_user is None or not scope.allows_empresa_id(target_user.empresa_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Bloqueo no encontrado"
         )

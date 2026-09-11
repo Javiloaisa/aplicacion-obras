@@ -1,5 +1,6 @@
 import uuid
 
+from fastapi import HTTPException, status
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
@@ -51,3 +52,31 @@ def assign_user_empresa(
             .where(MediaFile.user_id == user.id, MediaFile.empresa_id.is_(None))
             .values(empresa_id=empresa_id)
         )
+
+
+def resolve_upload_empresa(
+    db: Session,
+    user: User,
+    empresa_param: str | None,
+    work_entry: WorkEntry | None,
+) -> uuid.UUID | None:
+    """Decide which empresa a newly uploaded media file belongs to.
+
+    - Linked to a parte: inherits that parte's empresa (already validated
+      against the obra when the parte was created), overriding everything else.
+    - Worker, or admin scoped to a single empresa: their own empresa_id
+      (None if the worker is still pending classification).
+    - Admin with access to both companies: the empresa they picked in the
+      header selector for this upload; required, since there is no
+      "unassigned" option for new media.
+    """
+    if work_entry is not None:
+        return work_entry.empresa_id
+    if user.role == "admin" and user.acceso_todas_empresas:
+        if empresa_param is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Indica para qué empresa subes este archivo",
+            )
+        return get_empresa_by_slug(db, empresa_param).id
+    return user.empresa_id

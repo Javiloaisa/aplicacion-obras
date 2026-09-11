@@ -8,11 +8,13 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.deps import (
+    EmpresaScope,
     ensure_obra_access,
     get_current_user,
     get_db,
     get_obra_or_404,
     require_admin,
+    scope_empresa,
 )
 from app.models import MediaFile, Obra, User, WorkEntry
 from app.schemas.obra import (
@@ -29,9 +31,11 @@ router = APIRouter(prefix="/obras", tags=["obras"])
 def list_obras(
     status_filter: Literal["active", "archived"] | None = Query(None, alias="status"),
     user: User = Depends(get_current_user),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
     stmt = select(Obra).order_by(Obra.created_at.desc())
+    stmt = scope.filter_obras(stmt)
     if user.role == "admin":
         if status_filter is not None:
             stmt = stmt.where(Obra.status == status_filter)
@@ -57,10 +61,11 @@ def create_obra(
 def get_obra(
     obra_id: uuid.UUID,
     user: User = Depends(get_current_user),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
     obra = get_obra_or_404(db, obra_id)
-    ensure_obra_access(db, obra, user)
+    ensure_obra_access(db, obra, user, scope)
 
     photo_count = db.scalar(
         select(func.count()).where(
@@ -90,10 +95,12 @@ def get_obra(
 def update_obra(
     obra_id: uuid.UUID,
     body: ObraUpdate,
-    _admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
     obra = get_obra_or_404(db, obra_id)
+    ensure_obra_access(db, obra, admin, scope)
     data = body.model_dump(exclude_unset=True)
     new_status = data.pop("status", None)
     for field, value in data.items():

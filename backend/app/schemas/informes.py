@@ -28,6 +28,8 @@ class HorasEntryRow(BaseModel):
     validated: bool
     edited_by_admin: bool
     media_count: int
+    # None when the parte is still pending classification
+    empresa_nombre: str | None = None
 
 
 class TradeHoursRow(BaseModel):
