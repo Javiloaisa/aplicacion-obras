@@ -34,6 +34,11 @@ class MediaFile(Base):
     work_entry_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("work_entries.id", ondelete="SET NULL")
     )
+    # NULL = pending classification. Set from the uploader (or inherited from
+    # the linked work_entry) at upload time, never moves with a later reassignment
+    empresa_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("empresas.id"), index=True
+    )
     kind: Mapped[str] = mapped_column(
         Enum("photo", "video", name="media_kind", native_enum=False), nullable=False
     )

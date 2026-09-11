@@ -35,6 +35,10 @@ class WorkEntry(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
+    # NULL = pending classification, inherited from the worker at assignment time
+    empresa_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("empresas.id"), index=True
+    )
     work_date: Mapped[date] = mapped_column(Date, nullable=False)
     start_time: Mapped[time | None] = mapped_column(Time)
     end_time: Mapped[time | None] = mapped_column(Time)

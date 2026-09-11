@@ -19,7 +19,7 @@ import app.database as database
 from app.database import Base
 from app.deps import get_db
 from app.main import app
-from app.models import Obra, User
+from app.models import Empresa, Obra, User
 from app.security import create_access_token, hash_password
 
 engine = create_engine(
@@ -101,12 +101,15 @@ def worker2(db_session) -> User:
 
 @pytest.fixture
 def admin(db_session) -> User:
+    # Mirrors the migration's backfill: pre-existing admins get access to
+    # both companies rather than being left unable to see anything.
     user = User(
         username="jefe",
         full_name="Jefe Obra",
         password_hash=_ADMIN_HASH,
         role="admin",
         must_change_password=False,
+        acceso_todas_empresas=True,
     )
     db_session.add(user)
     db_session.commit()
@@ -129,6 +132,22 @@ def other_obra(db_session) -> Obra:
     db_session.add(o)
     db_session.commit()
     return o
+
+
+@pytest.fixture
+def empresa_nido(db_session) -> Empresa:
+    e = Empresa(nombre="Nido Constructions", slug="nido")
+    db_session.add(e)
+    db_session.commit()
+    return e
+
+
+@pytest.fixture
+def empresa_fega(db_session) -> Empresa:
+    e = Empresa(nombre="Fega Juan", slug="fega")
+    db_session.add(e)
+    db_session.commit()
+    return e
 
 
 def auth_headers(user: User) -> dict[str, str]:
