@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
+import { EmpresaFiltroProvider } from "@/lib/empresa-filtro-context";
 import Bloqueos from "@/pages/Bloqueos";
 import CambiarPassword from "@/pages/CambiarPassword";
 import Dashboard from "@/pages/Dashboard";
@@ -8,6 +9,7 @@ import Informes from "@/pages/Informes";
 import Login from "@/pages/Login";
 import ObraDetalle from "@/pages/ObraDetalle";
 import Obras from "@/pages/Obras";
+import SinAsignar from "@/pages/SinAsignar";
 import Usuarios from "@/pages/Usuarios";
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -32,6 +34,7 @@ function AppRoutes() {
       <Route path="/informes" element={<RequireAuth><Informes /></RequireAuth>} />
       <Route path="/usuarios" element={<RequireAuth><Usuarios /></RequireAuth>} />
       <Route path="/bloqueos" element={<RequireAuth><Bloqueos /></RequireAuth>} />
+      <Route path="/sin-asignar" element={<RequireAuth><SinAsignar /></RequireAuth>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -40,9 +43,11 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
+      <EmpresaFiltroProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </EmpresaFiltroProvider>
     </AuthProvider>
   );
 }

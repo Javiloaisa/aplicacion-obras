@@ -2,6 +2,21 @@
 
 export type Role = "admin" | "worker";
 
+// Slug of an empresa, or "todas" — only meaningful for a create-user payload
+// or as the value of the header filter for an admin with access to both.
+export type EmpresaSlug = "nido" | "fega";
+
+export interface Empresa {
+  id: string;
+  nombre: string;
+  slug: EmpresaSlug;
+}
+
+export interface PendientesResumen {
+  trabajadores: number;
+  obras: number;
+}
+
 // Suggested trades (mirror of backend TRADES). Stored as a free string.
 export const TRADES = [
   "Albañil",
@@ -28,6 +43,9 @@ export interface User {
   is_active: boolean;
   must_change_password: boolean;
   created_at: string;
+  // null = sin asignar (solo posible para role="worker")
+  empresa_id: string | null;
+  acceso_todas_empresas: boolean;
 }
 
 export interface TokenResponse {
@@ -46,6 +64,8 @@ export interface Obra {
   status: "active" | "archived";
   created_at: string;
   archived_at: string | null;
+  // Empresa slugs this obra is assigned to; [] = sin asignar
+  empresas: EmpresaSlug[];
 }
 
 export interface ObraDetail extends Obra {

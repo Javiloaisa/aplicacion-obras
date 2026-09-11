@@ -7,6 +7,7 @@ import {
 } from "react";
 import { login as apiLogin } from "./api";
 import { clearSession, getStoredUser, storeUser } from "./auth";
+import { clearEmpresaFiltro } from "./empresa-filtro";
 import type { User } from "./types";
 
 interface AuthContextValue {
@@ -29,6 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     clearSession();
+    clearEmpresaFiltro();
     setUser(null);
   }, []);
 

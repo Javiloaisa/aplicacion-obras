@@ -4,6 +4,7 @@ import {
   getRefreshToken,
   storeSession,
 } from "./auth";
+import { getEmpresaFiltro } from "./empresa-filtro";
 import type { TokenResponse } from "./types";
 
 export class ApiError extends Error {
@@ -59,15 +60,30 @@ async function tryRefresh(): Promise<boolean> {
 }
 
 /**
+ * Adds the header's empresa filter (if any) as a query param. Harmless on
+ * endpoints that ignore it (scope_empresa is only wired where it matters);
+ * on the ones that do use it, this makes "viewing as Nido" apply everywhere,
+ * including detail/edit calls — a deliberate full scope switch, not just a
+ * list filter.
+ */
+function withEmpresaFiltro(path: string): string {
+  const empresa = getEmpresaFiltro();
+  if (!empresa) return path;
+  const sep = path.includes("?") ? "&" : "?";
+  return `${path}${sep}empresa=${empresa}`;
+}
+
+/**
  * Authenticated fetch against the API with one automatic token refresh.
  * Throws ApiError on non-2xx and SessionExpiredError when auth is gone.
  */
 export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const url = withEmpresaFiltro(path);
   const doFetch = () => {
     const headers = new Headers(init.headers);
     const token = getAccessToken();
     if (token) headers.set("Authorization", `Bearer ${token}`);
-    return fetch(path, { ...init, headers });
+    return fetch(url, { ...init, headers });
   };
 
   let res = await doFetch();
@@ -89,7 +105,7 @@ export async function apiGet<T>(path: string): Promise<T> {
 }
 
 export async function apiSend<T>(
-  method: "POST" | "PATCH" | "DELETE",
+  method: "POST" | "PATCH" | "PUT" | "DELETE",
   path: string,
   body?: unknown,
 ): Promise<T> {
