@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -16,15 +16,24 @@ from app.deps import (
     require_admin,
     scope_empresa,
 )
-from app.models import MediaFile, Obra, User, WorkEntry
+from app.models import Empresa, MediaFile, Obra, User, WorkEntry
 from app.schemas.obra import (
     ObraCreate,
     ObraDetailOut,
+    ObraEmpresasBody,
     ObraOut,
+    ObrasAsignarEmpresasBody,
     ObraUpdate,
 )
 
 router = APIRouter(prefix="/obras", tags=["obras"])
+
+
+def _set_obra_empresas(db: Session, obra: Obra, slugs: list[str]) -> None:
+    if not slugs:
+        obra.empresas = []
+        return
+    obra.empresas = list(db.scalars(select(Empresa).where(Empresa.slug.in_(slugs))).all())
 
 
 @router.get("", response_model=list[ObraOut])
@@ -113,3 +122,43 @@ def update_obra(
     db.add(obra)
     db.commit()
     return obra
+
+
+@router.put("/{obra_id}/empresas", response_model=ObraOut)
+def set_obra_empresas(
+    obra_id: uuid.UUID,
+    body: ObraEmpresasBody,
+    admin: User = Depends(require_admin),
+    scope: EmpresaScope = Depends(scope_empresa),
+    db: Session = Depends(get_db),
+):
+    """Replace the full set of empresas an obra is assigned to ([] = sin asignar)."""
+    obra = get_obra_or_404(db, obra_id)
+    ensure_obra_access(db, obra, admin, scope)
+    _set_obra_empresas(db, obra, body.empresas)
+    db.commit()
+    db.refresh(obra)
+    return obra
+
+
+@router.post("/asignar-empresas", response_model=list[ObraOut])
+def asignar_empresas_obras(
+    body: ObrasAsignarEmpresasBody,
+    admin: User = Depends(require_admin),
+    scope: EmpresaScope = Depends(scope_empresa),
+    db: Session = Depends(get_db),
+):
+    """Same replacement as set_obra_empresas, applied to several obras at once."""
+    obras = db.scalars(select(Obra).where(Obra.id.in_(body.obra_ids))).all()
+    if len(obras) != len(set(body.obra_ids)):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Alguna de las obras no existe"
+        )
+    for obra in obras:
+        ensure_obra_access(db, obra, admin, scope)
+    for obra in obras:
+        _set_obra_empresas(db, obra, body.empresas)
+    db.commit()
+    for obra in obras:
+        db.refresh(obra)
+    return obras

@@ -69,3 +69,16 @@ class UserWithTempPassword(UserOut):
 class PasswordReveal(BaseModel):
     # None when the account has no recoverable password (created before the feature)
     password: str | None = None
+
+
+class AsignarEmpresaBody(BaseModel):
+    """Bulk-classify one or more workers into an empresa (see app.services.empresas)."""
+
+    user_ids: list[uuid.UUID] = Field(min_length=1)
+    empresa: Literal["nido", "fega"]
+
+
+class MeEmpresaBody(BaseModel):
+    """The single empresa an admin with access to both wants to keep."""
+
+    empresa: Literal["nido", "fega"]

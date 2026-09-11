@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.deps import EmpresaScope, get_db, require_admin, scope_empresa
 from app.models import MediaFile, User, WorkEntry
 from app.schemas.user import (
+    AsignarEmpresaBody,
     PasswordReveal,
     UserCreate,
     UserOut,
@@ -17,7 +18,7 @@ from app.schemas.user import (
 )
 from app.security import decrypt_password, set_password
 from app.services import storage
-from app.services.empresas import get_empresa_by_slug
+from app.services.empresas import assign_user_empresa, get_empresa_by_slug
 
 router = APIRouter(prefix="/usuarios", tags=["usuarios"])
 
@@ -95,6 +96,40 @@ def create_usuario(
     out = UserWithTempPassword.model_validate(user)
     out.temp_password = temp_password
     return out
+
+
+@router.post("/asignar-empresa", response_model=list[UserOut])
+def asignar_empresa_usuarios(
+    body: AsignarEmpresaBody,
+    _admin: User = Depends(require_admin),
+    scope: EmpresaScope = Depends(scope_empresa),
+    db: Session = Depends(get_db),
+):
+    """Classify one or more workers into an empresa (bulk), inheriting their
+    pending partes/media. Targets outside the caller's scope 404, same as
+    editing a single user; only workers can be assigned this way — admins
+    are never left pending (see the CHECK constraints on empresa scope)."""
+    users = db.scalars(select(User).where(User.id.in_(body.user_ids))).all()
+    if len(users) != len(set(body.user_ids)) or any(
+        not scope.allows_empresa_id(u.empresa_id) for u in users
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Alguno de los trabajadores no existe",
+        )
+    if any(u.role != "worker" for u in users):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Solo se pueden clasificar trabajadores con este endpoint",
+        )
+
+    empresa_id = get_empresa_by_slug(db, body.empresa).id
+    for u in users:
+        assign_user_empresa(db, u, empresa_id=empresa_id)
+    db.commit()
+    for u in users:
+        db.refresh(u)
+    return users
 
 
 @router.patch("/{user_id}", response_model=UserWithTempPassword)

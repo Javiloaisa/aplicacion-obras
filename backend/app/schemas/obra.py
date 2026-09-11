@@ -45,3 +45,16 @@ class ObraDetailOut(ObraOut):
     photo_count: int
     video_count: int
     total_hours: Decimal
+
+
+class ObraEmpresasBody(BaseModel):
+    """Full replacement set of empresas for one obra; [] means "sin asignar"."""
+
+    empresas: list[Literal["nido", "fega"]] = []
+
+
+class ObrasAsignarEmpresasBody(BaseModel):
+    """Same replacement, applied to several obras at once."""
+
+    obra_ids: list[uuid.UUID] = Field(min_length=1)
+    empresas: list[Literal["nido", "fega"]] = []

@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import HTTPException, status
-from sqlalchemy import select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.models import Empresa, MediaFile, User, WorkEntry
@@ -52,6 +52,19 @@ def assign_user_empresa(
             .where(MediaFile.user_id == user.id, MediaFile.empresa_id.is_(None))
             .values(empresa_id=empresa_id)
         )
+
+
+def count_admins_with_access(
+    db: Session, empresa_id: uuid.UUID, *, exclude_user_id: uuid.UUID | None = None
+) -> int:
+    """How many admins can currently see this empresa (own it, or access both)."""
+    stmt = select(func.count()).select_from(User).where(
+        User.role == "admin",
+        or_(User.empresa_id == empresa_id, User.acceso_todas_empresas.is_(True)),
+    )
+    if exclude_user_id is not None:
+        stmt = stmt.where(User.id != exclude_user_id)
+    return db.scalar(stmt) or 0
 
 
 def resolve_upload_empresa(
