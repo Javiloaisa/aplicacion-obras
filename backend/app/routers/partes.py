@@ -7,11 +7,14 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.deps import (
+    EmpresaScope,
     ensure_obra_access,
+    ensure_obra_matches_empresa,
     get_current_user,
     get_db,
     get_obra_or_404,
     require_admin,
+    scope_empresa,
 )
 from app.models import BlockedDay, Obra, User, WorkEntry
 from app.schemas.work_entry import (
@@ -98,6 +101,17 @@ def _check_blocked_day(
         )
 
 
+def _get_entry_in_scope_or_404(
+    db: Session, entry_id: uuid.UUID, scope: EmpresaScope
+) -> WorkEntry:
+    entry = db.get(WorkEntry, entry_id)
+    if entry is None or not scope.allows_empresa_id(entry.empresa_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Parte no encontrado"
+        )
+    return entry
+
+
 def _can_modify(entry: WorkEntry, user: User) -> None:
     if user.role == "admin":
         return
@@ -123,32 +137,40 @@ def create_entry(
     obra_id: uuid.UUID,
     body: WorkEntryCreate,
     user: User = Depends(get_current_user),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
     obra = get_obra_or_404(db, obra_id)
-    ensure_obra_access(db, obra, user)
+    ensure_obra_access(db, obra, user, scope)
 
-    target_user_id = user.id
+    target_user = user
     if body.user_id is not None and body.user_id != user.id:
         if user.role != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No puedes crear partes para otros trabajadores",
             )
-        if db.get(User, body.user_id) is None:
+        target_user = db.get(User, body.user_id)
+        if target_user is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Usuario no encontrado",
             )
-        target_user_id = body.user_id
 
-    _check_blocked_day(db, user, target_user_id, body.work_date)
+    # The obra must be usable by the *target* worker's empresa, which can
+    # differ from the requester's own scope (an admin filing on their behalf)
+    ensure_obra_matches_empresa(obra, target_user.empresa_id)
+
+    _check_blocked_day(db, user, target_user.id, body.work_date)
     hours = _resolve_hours(body.start_time, body.end_time, body.hours)
-    _check_daily_cap(db, target_user_id, body.work_date, hours)
+    _check_daily_cap(db, target_user.id, body.work_date, hours)
 
     entry = WorkEntry(
         obra_id=obra.id,
-        user_id=target_user_id,
+        user_id=target_user.id,
+        # Never from the body: the parte belongs to whichever empresa the
+        # target worker belongs to (NULL if they are still unclassified)
+        empresa_id=target_user.empresa_id,
         work_date=body.work_date,
         start_time=body.start_time,
         end_time=body.end_time,
@@ -167,10 +189,11 @@ def list_obra_entries(
     from_date: date | None = Query(None, alias="from"),
     to_date: date | None = Query(None, alias="to"),
     user: User = Depends(get_current_user),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
     obra = get_obra_or_404(db, obra_id)
-    ensure_obra_access(db, obra, user)
+    ensure_obra_access(db, obra, user, scope)
 
     stmt = (
         select(WorkEntry, User.full_name)
@@ -178,6 +201,7 @@ def list_obra_entries(
         .where(WorkEntry.obra_id == obra.id)
         .order_by(WorkEntry.work_date.desc(), WorkEntry.created_at.desc())
     )
+    stmt = scope.apply(stmt, WorkEntry.empresa_id)
     if user.role != "admin":
         stmt = stmt.where(WorkEntry.user_id == user.id)
     elif user_id is not None:
@@ -235,13 +259,10 @@ def update_entry(
     entry_id: uuid.UUID,
     body: WorkEntryUpdate,
     user: User = Depends(get_current_user),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
-    entry = db.get(WorkEntry, entry_id)
-    if entry is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Parte no encontrado"
-        )
+    entry = _get_entry_in_scope_or_404(db, entry_id, scope)
     _can_modify(entry, user)
 
     data = body.model_dump(exclude_unset=True)
@@ -252,6 +273,7 @@ def update_entry(
                 detail="Solo el administrador puede cambiar la obra de un parte",
             )
         new_obra = get_obra_or_404(db, data["obra_id"])
+        ensure_obra_matches_empresa(new_obra, entry.empresa_id)
         entry.obra_id = new_obra.id
     if "work_date" in data:
         _check_blocked_day(db, user, entry.user_id, data["work_date"])
@@ -288,13 +310,10 @@ def validate_entry(
     entry_id: uuid.UUID,
     body: WorkEntryValidate,
     _admin: User = Depends(require_admin),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
-    entry = db.get(WorkEntry, entry_id)
-    if entry is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Parte no encontrado"
-        )
+    entry = _get_entry_in_scope_or_404(db, entry_id, scope)
     entry.validated = body.validated
     db.add(entry)
     db.commit()
@@ -305,13 +324,10 @@ def validate_entry(
 def delete_entry(
     entry_id: uuid.UUID,
     user: User = Depends(get_current_user),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
-    entry = db.get(WorkEntry, entry_id)
-    if entry is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Parte no encontrado"
-        )
+    entry = _get_entry_in_scope_or_404(db, entry_id, scope)
     _can_modify(entry, user)
     db.delete(entry)
     db.commit()

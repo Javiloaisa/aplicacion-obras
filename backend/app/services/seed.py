@@ -24,6 +24,9 @@ def seed_admin(db: Session) -> None:
         role="admin",
         is_active=True,
         must_change_password=True,
+        # Same default as the migration backfill: a freshly seeded admin
+        # must not be locked out of either company.
+        acceso_todas_empresas=True,
     )
     db.add(admin)
     db.commit()

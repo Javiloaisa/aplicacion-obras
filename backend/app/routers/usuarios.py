@@ -6,9 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
-from app.deps import get_db, require_admin
+from app.deps import EmpresaScope, get_db, require_admin, scope_empresa
 from app.models import MediaFile, User, WorkEntry
 from app.schemas.user import (
+    AsignarEmpresaBody,
     PasswordReveal,
     UserCreate,
     UserOut,
@@ -17,6 +18,7 @@ from app.schemas.user import (
 )
 from app.security import decrypt_password, set_password
 from app.services import storage
+from app.services.empresas import assign_user_empresa, get_empresa_by_slug
 
 router = APIRouter(prefix="/usuarios", tags=["usuarios"])
 
@@ -28,12 +30,24 @@ def _temp_password(length: int = 10) -> str:
     return "".join(secrets.choice(_PASSWORD_ALPHABET) for _ in range(length))
 
 
+def _get_usuario_in_scope_or_404(db: Session, user_id: uuid.UUID, scope: EmpresaScope) -> User:
+    user = db.get(User, user_id)
+    if user is None or not scope.allows_user(user):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
+        )
+    return user
+
+
 @router.get("", response_model=list[UserOut])
 def list_usuarios(
     _admin: User = Depends(require_admin),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
-    return db.scalars(select(User).order_by(User.full_name)).all()
+    stmt = select(User).order_by(User.full_name)
+    stmt = scope.filter_users(stmt)
+    return db.scalars(stmt).all()
 
 
 @router.post(
@@ -44,12 +58,25 @@ def create_usuario(
     _admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    # Any admin can create a user in either empresa (or both, for a new
+    # admin), regardless of their own scope — only editing/removing an
+    # existing user is scope-restricted. See update_usuario/delete_usuario.
+    if body.role == "worker" and body.empresa == "todas":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Un trabajador no puede tener acceso a ambas empresas",
+        )
+
     username = body.username.lower()
     if db.scalar(select(User).where(User.username == username)) is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Ya existe un usuario con ese nombre",
         )
+
+    empresa_id = (
+        None if body.empresa == "todas" else get_empresa_by_slug(db, body.empresa).id
+    )
 
     temp_password = _temp_password()
     user = User(
@@ -59,6 +86,8 @@ def create_usuario(
         phone=body.phone,
         trade=body.trade,
         role=body.role,
+        empresa_id=empresa_id,
+        acceso_todas_empresas=(body.empresa == "todas"),
     )
     set_password(user, temp_password, must_change=True)
     db.add(user)
@@ -69,18 +98,49 @@ def create_usuario(
     return out
 
 
+@router.post("/asignar-empresa", response_model=list[UserOut])
+def asignar_empresa_usuarios(
+    body: AsignarEmpresaBody,
+    _admin: User = Depends(require_admin),
+    scope: EmpresaScope = Depends(scope_empresa),
+    db: Session = Depends(get_db),
+):
+    """Classify one or more workers into an empresa (bulk), inheriting their
+    pending partes/media. Targets outside the caller's scope 404, same as
+    editing a single user; only workers can be assigned this way — admins
+    are never left pending (see the CHECK constraints on empresa scope)."""
+    users = db.scalars(select(User).where(User.id.in_(body.user_ids))).all()
+    if len(users) != len(set(body.user_ids)) or any(
+        not scope.allows_user(u) for u in users
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Alguno de los trabajadores no existe",
+        )
+    if any(u.role != "worker" for u in users):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Solo se pueden clasificar trabajadores con este endpoint",
+        )
+
+    empresa_id = get_empresa_by_slug(db, body.empresa).id
+    for u in users:
+        assign_user_empresa(db, u, empresa_id=empresa_id)
+    db.commit()
+    for u in users:
+        db.refresh(u)
+    return users
+
+
 @router.patch("/{user_id}", response_model=UserWithTempPassword)
 def update_usuario(
     user_id: uuid.UUID,
     body: UserUpdate,
     admin: User = Depends(require_admin),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
-    user = db.get(User, user_id)
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
-        )
+    user = _get_usuario_in_scope_or_404(db, user_id, scope)
 
     data = body.model_dump(exclude_unset=True)
     reset_password = data.pop("reset_password", False)
@@ -93,6 +153,22 @@ def update_usuario(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No puedes desactivar ni degradar tu propia cuenta",
+        )
+
+    # Promoting a still-unclassified user to admin would violate the
+    # admin_scope_obligatorio constraint (an admin always needs empresa_id
+    # or acceso_todas_empresas). Empresa assignment is a separate step
+    # (POST /usuarios/asignar-empresa), so surface a clear error instead of
+    # letting the commit fail with a raw IntegrityError.
+    if (
+        data.get("role") == "admin"
+        and user.role != "admin"
+        and user.empresa_id is None
+        and not user.acceso_todas_empresas
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Asigna primero una empresa a este usuario antes de convertirlo en administrador",
         )
 
     for field, value in data.items():
@@ -117,6 +193,7 @@ def update_usuario(
 def reveal_password(
     user_id: uuid.UUID,
     _admin: User = Depends(require_admin),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
     """Return a worker's current password so the admin can remind them of it.
@@ -124,11 +201,7 @@ def reveal_password(
     Only accounts whose password was set after this feature shipped have a
     recoverable copy; older ones return null and must be reset instead.
     """
-    user = db.get(User, user_id)
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
-        )
+    user = _get_usuario_in_scope_or_404(db, user_id, scope)
     return PasswordReveal(password=decrypt_password(user.password_enc))
 
 
@@ -136,13 +209,10 @@ def reveal_password(
 def delete_usuario(
     user_id: uuid.UUID,
     admin: User = Depends(require_admin),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
-    user = db.get(User, user_id)
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
-        )
+    user = _get_usuario_in_scope_or_404(db, user_id, scope)
     if user.id == admin.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

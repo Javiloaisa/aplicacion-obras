@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ObraCreate(BaseModel):
@@ -32,9 +32,29 @@ class ObraOut(BaseModel):
     status: Literal["active", "archived"]
     created_at: datetime
     archived_at: datetime | None
+    # Empresa slugs this obra is assigned to; empty means "sin asignar"
+    empresas: list[str] = []
+
+    @field_validator("empresas", mode="before")
+    @classmethod
+    def _empresa_slugs(cls, v):
+        return [e.slug if hasattr(e, "slug") else e for e in v]
 
 
 class ObraDetailOut(ObraOut):
     photo_count: int
     video_count: int
     total_hours: Decimal
+
+
+class ObraEmpresasBody(BaseModel):
+    """Full replacement set of empresas for one obra; [] means "sin asignar"."""
+
+    empresas: list[Literal["nido", "fega"]] = []
+
+
+class ObrasAsignarEmpresasBody(BaseModel):
+    """Same replacement, applied to several obras at once."""
+
+    obra_ids: list[uuid.UUID] = Field(min_length=1)
+    empresas: list[Literal["nido", "fega"]] = []

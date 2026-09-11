@@ -22,11 +22,15 @@ def make_png() -> bytes:
 FAKE_WEBM = b"\x1a\x45\xdf\xa3" + b"\x00" * 256
 
 
-def upload(client, obra_id, headers, filename="foto.jpg", content=None, caption=None):
+def upload(
+    client, obra_id, headers, filename="foto.jpg", content=None, caption=None, empresa=None
+):
     files = [("files", (filename, content if content is not None else make_jpeg(), "application/octet-stream"))]
     data = {}
     if caption is not None:
         data["caption"] = caption
+    if empresa is not None:
+        data["empresa"] = empresa
     return client.post(
         f"/api/v1/obras/{obra_id}/media", files=files, data=data, headers=headers
     )
@@ -92,11 +96,11 @@ def test_multiple_files_in_one_request(client, worker_headers, obra):
 
 
 def test_list_media_with_filters_and_pagination(
-    client, worker_headers, admin_headers, obra, worker
+    client, worker_headers, admin_headers, obra, worker, empresa_nido
 ):
     upload(client, obra.id, worker_headers)
     upload(client, obra.id, worker_headers, filename="video.webm", content=FAKE_WEBM)
-    upload(client, obra.id, admin_headers, filename="jefe.jpg")
+    upload(client, obra.id, admin_headers, filename="jefe.jpg", empresa="nido")
 
     res = client.get(f"/api/v1/obras/{obra.id}/media", headers=admin_headers)
     assert res.status_code == 200
@@ -179,9 +183,9 @@ def test_download_file_supports_range(client, worker_headers, obra):
 
 
 def test_worker_downloads_media_of_any_active_obra(
-    client, worker_headers, admin_headers, other_obra
+    client, worker_headers, admin_headers, other_obra, empresa_nido
 ):
-    item = upload(client, other_obra.id, admin_headers).json()[0]
+    item = upload(client, other_obra.id, admin_headers, empresa="nido").json()[0]
     res = client.get(f"/api/v1/media/{item['id']}/file", headers=worker_headers)
     assert res.status_code == 200
 

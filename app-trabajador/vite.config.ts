@@ -32,12 +32,17 @@ export default defineConfig({
         // Precache the app shell; the API is network-first so fresh data
         // wins but the last response still works without coverage
         navigateFallbackDenylist: [/^\/api\//],
+        cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
             urlPattern: /\/api\/v1\/(obras|entries)/,
             handler: "NetworkFirst",
             options: {
-              cacheName: "api-cache",
+              // Bump this suffix whenever a deploy changes which obras/entries
+              // a worker is allowed to see (e.g. the multiempresa rollout) —
+              // renaming abandons the old cache instead of serving stale
+              // offline data for records the worker can no longer access.
+              cacheName: "api-cache-v2-multiempresa",
               networkTimeoutSeconds: 5,
               expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 7 },
             },

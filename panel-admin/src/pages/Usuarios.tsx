@@ -24,10 +24,31 @@ import {
 } from "@/components/ui/table";
 import { apiGet, apiSend } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { TRADES, type User, type UserWithTempPassword } from "@/lib/types";
+import { EMPRESA_NOMBRE, useEmpresasById } from "@/lib/use-empresas";
+import {
+  TRADES,
+  type Empresa,
+  type EmpresaSlug,
+  type User,
+  type UserWithTempPassword,
+} from "@/lib/types";
+
+function EmpresaLabel({ user, empresasById }: { user: User; empresasById: Map<string, Empresa> }) {
+  if (user.acceso_todas_empresas) return <Badge variant="secondary">Ambas empresas</Badge>;
+  if (!user.empresa_id) return <span className="text-muted-foreground">Sin asignar</span>;
+  const empresa = empresasById.get(user.empresa_id);
+  return <span>{empresa?.nombre ?? "—"}</span>;
+}
+
+/** True when `created` won't appear in `me`'s own /usuarios list afterwards. */
+function isOutOfCreatorScope(me: User | null, created: User): boolean {
+  if (!me || me.acceso_todas_empresas) return false;
+  return created.empresa_id !== me.empresa_id;
+}
 
 export default function Usuarios() {
   const { user: me } = useAuth();
+  const empresasById = useEmpresasById();
   const [users, setUsers] = useState<User[] | null>(null);
   const [error, setError] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -35,6 +56,7 @@ export default function Usuarios() {
   const [passwordUser, setPasswordUser] = useState<User | null>(null);
   const [tempPassword, setTempPassword] = useState<{ name: string; password: string } | null>(null);
   const [shownPassword, setShownPassword] = useState<{ name: string; password: string } | null>(null);
+  const [outOfScopeNotice, setOutOfScopeNotice] = useState<string | null>(null);
 
   const load = useCallback(() => {
     apiGet<User[]>("/api/v1/usuarios")
@@ -130,6 +152,12 @@ export default function Usuarios() {
                     password: created.temp_password,
                   });
                 }
+                if (created && isOutOfCreatorScope(me, created)) {
+                  setOutOfScopeNotice(
+                    `${created.full_name} se ha creado correctamente, pero queda fuera de tu ámbito ` +
+                      "actual: no te aparecerá en tu lista de usuarios a partir de ahora.",
+                  );
+                }
               }}
             />
           </DialogContent>
@@ -146,6 +174,7 @@ export default function Usuarios() {
               <TableHead>Usuario</TableHead>
               <TableHead>Oficio</TableHead>
               <TableHead>Rol</TableHead>
+              <TableHead>Empresa</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
@@ -162,6 +191,9 @@ export default function Usuarios() {
                   ) : (
                     <Badge variant="secondary">Trabajador</Badge>
                   )}
+                </TableCell>
+                <TableCell>
+                  <EmpresaLabel user={user} empresasById={empresasById} />
                 </TableCell>
                 <TableCell>
                   {user.is_active ? (
@@ -297,6 +329,22 @@ export default function Usuarios() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      {/* Out-of-scope confirmation after creating a user the creator won't see again */}
+      <Dialog
+        open={outOfScopeNotice !== null}
+        onOpenChange={(open) => !open && setOutOfScopeNotice(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Usuario creado</DialogTitle>
+            <DialogDescription>{outOfScopeNotice}</DialogDescription>
+          </DialogHeader>
+          <Button className="w-full" onClick={() => setOutOfScopeNotice(null)}>
+            Entendido
+          </Button>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
@@ -310,6 +358,7 @@ function UserForm({
   tradeSuggestions: string[];
   onSaved: (user: UserWithTempPassword | User) => void;
 }) {
+  const { user: me } = useAuth();
   const isEdit = !!existing;
   const [username, setUsername] = useState(existing?.username ?? "");
   const [fullName, setFullName] = useState(existing?.full_name ?? "");
@@ -317,8 +366,33 @@ function UserForm({
   const [phone, setPhone] = useState(existing?.phone ?? "");
   const [trade, setTrade] = useState(existing?.trade ?? "");
   const [role, setRole] = useState<"worker" | "admin">(existing?.role ?? "worker");
+  const empresasById = useEmpresasById();
+  const [empresa, setEmpresa] = useState<EmpresaSlug | "todas" | "">("");
+  const [empresaTouched, setEmpresaTouched] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // Preselect the creator's own empresa once the lookup arrives — the map
+  // starts empty (fetched async), so this can't just be the useState initial value.
+  useEffect(() => {
+    if (isEdit || empresaTouched || !me || me.acceso_todas_empresas || !me.empresa_id) return;
+    const slug = empresasById.get(me.empresa_id)?.slug;
+    if (slug) setEmpresa(slug);
+  }, [empresasById, empresaTouched, isEdit, me]);
+
+  function handleEmpresaChange(next: EmpresaSlug | "todas") {
+    setEmpresa(next);
+    setEmpresaTouched(true);
+  }
+
+  function handleRoleChange(next: "worker" | "admin") {
+    setRole(next);
+    // "todas" only makes sense for an admin
+    if (next === "worker" && empresa === "todas") {
+      setEmpresa("");
+      setEmpresaTouched(false);
+    }
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -337,6 +411,7 @@ function UserForm({
         : await apiSend<UserWithTempPassword>("POST", "/api/v1/usuarios", {
             username,
             ...payload,
+            empresa,
           });
       onSaved(saved);
     } catch (err) {
@@ -405,14 +480,45 @@ function UserForm({
         <Select
           id="f-role"
           value={role}
-          onChange={(e) => setRole(e.target.value as "worker" | "admin")}
+          onChange={(e) => handleRoleChange(e.target.value as "worker" | "admin")}
         >
           <option value="worker">Trabajador</option>
           <option value="admin">Administrador</option>
         </Select>
       </div>
+      {isEdit ? (
+        <div className="space-y-1">
+          <Label>Empresa</Label>
+          <p className="text-sm text-muted-foreground">
+            {existing?.acceso_todas_empresas
+              ? "Ambas empresas"
+              : existing?.empresa_id
+                ? (empresasById.get(existing.empresa_id)?.nombre ?? "—")
+                : "Sin asignar"}
+            {" — "}
+            se cambia desde «Sin asignar» o el apartado de empresas de cada obra, no aquí.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <Label htmlFor="f-empresa">Empresa *</Label>
+          <Select
+            id="f-empresa"
+            value={empresa}
+            onChange={(e) => handleEmpresaChange(e.target.value as EmpresaSlug | "todas")}
+            required
+          >
+            <option value="" disabled>
+              Elige una empresa
+            </option>
+            <option value="nido">{EMPRESA_NOMBRE.nido}</option>
+            <option value="fega">{EMPRESA_NOMBRE.fega}</option>
+            {role === "admin" ? <option value="todas">Ambas empresas</option> : null}
+          </Select>
+        </div>
+      )}
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <Button type="submit" className="w-full" disabled={busy}>
+      <Button type="submit" className="w-full" disabled={busy || (!isEdit && !empresa)}>
         {busy ? "Guardando..." : isEdit ? "Guardar cambios" : "Crear usuario"}
       </Button>
     </form>

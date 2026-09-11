@@ -91,6 +91,7 @@ def build_horas_pdf(
     obra_label: str | None,
     worker_label: str | None,
     generated: str,
+    show_empresa: bool = False,
 ) -> bytes:
     buf = io.BytesIO()
     w, h = A4
@@ -159,13 +160,17 @@ def build_horas_pdf(
     dt.setStyle(_table_style(total=True))
     story.append(dt)
 
-    _append_day_detail(story, data, width=w - 80, show_obra=obra_label is None)
+    _append_day_detail(
+        story, data, width=w - 80, show_obra=obra_label is None, show_empresa=show_empresa
+    )
 
     doc.build(story)
     return buf.getvalue()
 
 
-def _append_day_detail(story, data: HorasReportOut, *, width: float, show_obra: bool) -> None:
+def _append_day_detail(
+    story, data: HorasReportOut, *, width: float, show_obra: bool, show_empresa: bool = False
+) -> None:
     """Day-by-day rows grouped by worker, with the notes each parte carries."""
     if not data.entries:
         return
@@ -174,14 +179,21 @@ def _append_day_detail(story, data: HorasReportOut, *, width: float, show_obra: 
 
     by_worker: dict[str, list] = {}
     trades: dict[str, str | None] = {}
+    empresas: dict[str, str | None] = {}
     for e in data.entries:
         by_worker.setdefault(e.user_full_name, []).append(e)
         trades.setdefault(e.user_full_name, e.trade)
+        empresas.setdefault(e.user_full_name, e.empresa_nombre)
 
     for name in sorted(by_worker, key=str.lower):
         entries = sorted(by_worker[name], key=lambda e: e.work_date)
         trade = trades.get(name)
-        story.append(Paragraph(f"{name}{f' · {trade}' if trade else ''}", _h3))
+        heading = name
+        if trade:
+            heading += f" · {trade}"
+        if show_empresa:
+            heading += f" · {empresas.get(name) or 'Sin asignar'}"
+        story.append(Paragraph(heading, _h3))
 
         head = ["Fecha", "Obra", "Horas", "Validado", "Notas"] if show_obra else [
             "Fecha", "Horas", "Validado", "Notas"

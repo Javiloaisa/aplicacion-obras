@@ -117,10 +117,13 @@ def test_csv_export(client, admin_headers, obra, other_obra, worker, worker2):
     assert "attachment" in res.headers["content-disposition"]
 
     lines = res.text.lstrip("﻿").strip().splitlines()
-    assert lines[0] == "obra;trabajador;oficio;fecha;inicio;fin;horas;validado;notas"
+    # admin fixture has acceso_todas_empresas=True: unrestricted scope, so the
+    # export includes the "empresa" column
+    assert lines[0] == "obra;trabajador;oficio;fecha;inicio;fin;horas;validado;notas;empresa"
     assert len(lines) == 4  # header + 3 entries in this obra
     assert "Trabajador Uno" in res.text
     assert "Nave Industrial" not in res.text
+    assert "Sin asignar" in res.text  # neither worker is classified yet
 
 
 def test_csv_export_requires_admin(client, worker_headers):

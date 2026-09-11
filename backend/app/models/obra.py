@@ -2,9 +2,10 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, Enum, String, Text, Uuid, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.models.empresa import Empresa, obra_empresas
 
 
 class Obra(Base):
@@ -24,3 +25,6 @@ class Obra(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    # No rows means "unassigned": visible to every empresa until classified
+    empresas: Mapped[list["Empresa"]] = relationship(secondary=obra_empresas)

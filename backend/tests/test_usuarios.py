@@ -11,10 +11,14 @@ def test_admin_lists_users(client, admin_headers, worker):
     assert "jefe" in usernames
 
 
-def test_create_user_returns_temp_password_once(client, admin_headers):
+def test_create_user_returns_temp_password_once(client, admin_headers, empresa_nido):
     res = client.post(
         "/api/v1/usuarios",
-        json={"username": "Nuevo.Trabajador", "full_name": "Nuevo Trabajador"},
+        json={
+            "username": "Nuevo.Trabajador",
+            "full_name": "Nuevo Trabajador",
+            "empresa": "nido",
+        },
         headers=admin_headers,
     )
     assert res.status_code == 201
@@ -41,10 +45,10 @@ def test_create_user_returns_temp_password_once(client, admin_headers):
     assert all("temp_password" not in u for u in listed)
 
 
-def test_duplicate_username_rejected(client, admin_headers, worker):
+def test_duplicate_username_rejected(client, admin_headers, worker, empresa_nido):
     res = client.post(
         "/api/v1/usuarios",
-        json={"username": "worker1", "full_name": "Duplicado"},
+        json={"username": "worker1", "full_name": "Duplicado", "empresa": "nido"},
         headers=admin_headers,
     )
     assert res.status_code == 409
@@ -193,10 +197,10 @@ def test_new_password_too_short_rejected(client, admin_headers, worker):
     assert res.status_code == 422
 
 
-def test_delete_user_without_history(client, admin_headers):
+def test_delete_user_without_history(client, admin_headers, empresa_nido):
     created = client.post(
         "/api/v1/usuarios",
-        json={"username": "borrame", "full_name": "Borrame"},
+        json={"username": "borrame", "full_name": "Borrame", "empresa": "nido"},
         headers=admin_headers,
     ).json()
 

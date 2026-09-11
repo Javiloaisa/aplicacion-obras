@@ -229,22 +229,29 @@ def _write_summary(
     _widths(ws, SUMMARY_WIDTHS)
 
 
-def _write_detail(book: _Book, ws: Worksheet, data: HorasReportOut) -> None:
+def _write_detail(
+    book: _Book, ws: Worksheet, data: HorasReportOut, *, show_empresa: bool = False
+) -> None:
     """One row per parte, grouped by worker and in date order like the PDF."""
-    book.put(ws, 1, DETAIL_HEAD, style=HEAD)
+    head = DETAIL_HEAD + ["Empresa"] if show_empresa else DETAIL_HEAD
+    widths = DETAIL_WIDTHS + [16] if show_empresa else DETAIL_WIDTHS
+    book.put(ws, 1, head, style=HEAD)
     entries = sorted(data.entries, key=lambda e: (e.user_full_name.lower(), e.work_date, e.obra_name))
     cols = {1: {"num_format": DATE}, 5: {"num_format": HOURS}, 8: WRAP}
     for row, e in enumerate(entries, 2):
-        book.put(ws, row, [
+        values = [
             e.work_date, e.obra_name, e.user_full_name, e.trade or NO_TRADE,
             _days(hours_to_minutes(e.hours)),
             "Sí" if e.validated else "Pendiente",
             "Sí" if e.edited_by_admin else "",
             e.notes or "",
-        ], cols)
+        ]
+        if show_empresa:
+            values.append(e.empresa_nombre or "Sin asignar")
+        book.put(ws, row, values, cols)
     ws.freeze_panes(1, 0)
-    ws.autofilter(0, 0, len(entries), len(DETAIL_HEAD) - 1)
-    _widths(ws, DETAIL_WIDTHS)
+    ws.autofilter(0, 0, len(entries), len(head) - 1)
+    _widths(ws, widths)
 
 
 def build_horas_xlsx(
@@ -254,6 +261,7 @@ def build_horas_xlsx(
     obra_label: str | None,
     worker_label: str | None,
     generated: str,
+    show_empresa: bool = False,
 ) -> bytes:
     buf = io.BytesIO()
     book = _Book(buf)
@@ -263,6 +271,6 @@ def build_horas_xlsx(
         book, summary, data,
         period=period, obra_label=obra_label, worker_label=worker_label, generated=generated,
     )
-    _write_detail(book, detail, data)
+    _write_detail(book, detail, data, show_empresa=show_empresa)
     book.wb.close()
     return buf.getvalue()

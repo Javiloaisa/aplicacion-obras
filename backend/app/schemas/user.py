@@ -34,6 +34,8 @@ class UserOut(BaseModel):
     is_active: bool
     must_change_password: bool
     created_at: datetime
+    empresa_id: uuid.UUID | None = None
+    acceso_todas_empresas: bool = False
 
 
 class UserCreate(BaseModel):
@@ -43,6 +45,8 @@ class UserCreate(BaseModel):
     phone: str | None = Field(None, max_length=30)
     trade: str | None = Field(None, max_length=50)
     role: Literal["admin", "worker"] = "worker"
+    # Mandatory for every new user: "todas" is only valid together with role=admin
+    empresa: Literal["nido", "fega", "todas"]
 
 
 class UserUpdate(BaseModel):
@@ -65,3 +69,16 @@ class UserWithTempPassword(UserOut):
 class PasswordReveal(BaseModel):
     # None when the account has no recoverable password (created before the feature)
     password: str | None = None
+
+
+class AsignarEmpresaBody(BaseModel):
+    """Bulk-classify one or more workers into an empresa (see app.services.empresas)."""
+
+    user_ids: list[uuid.UUID] = Field(min_length=1)
+    empresa: Literal["nido", "fega"]
+
+
+class MeEmpresaBody(BaseModel):
+    """The single empresa an admin with access to both wants to keep."""
+
+    empresa: Literal["nido", "fega"]

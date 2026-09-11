@@ -23,15 +23,19 @@ from sqlalchemy.orm import Session
 from starlette.background import BackgroundTask
 
 from app.deps import (
+    EmpresaScope,
     ensure_obra_access,
+    ensure_obra_matches_empresa,
     get_current_user,
     get_db,
     get_obra_or_404,
     require_admin,
+    scope_empresa,
 )
 from app.models import MediaFile, Obra, User, WorkEntry
 from app.schemas.media import MediaListOut, MediaOut, MediaUpdate
 from app.services import storage
+from app.services.empresas import resolve_upload_empresa
 from app.services.thumbnails import generate_thumbnail
 from app.utils import ensure_utc
 
@@ -69,9 +73,19 @@ def _get_media_or_404(db: Session, media_id: uuid.UUID) -> MediaFile:
     return media
 
 
-def _ensure_media_access(db: Session, media: MediaFile, user: User) -> None:
+def _ensure_media_in_scope(media: MediaFile, scope: EmpresaScope) -> None:
+    if not scope.allows_empresa_id(media.empresa_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Archivo no encontrado"
+        )
+
+
+def _ensure_media_access(
+    db: Session, media: MediaFile, user: User, scope: EmpresaScope
+) -> None:
     obra = get_obra_or_404(db, media.obra_id)
-    ensure_obra_access(db, obra, user)
+    ensure_obra_access(db, obra, user, scope)
+    _ensure_media_in_scope(media, scope)
 
 
 @router.post(
@@ -85,12 +99,17 @@ def upload_media(
     files: list[UploadFile] = File(...),
     caption: str | None = Form(None),
     work_entry_id: uuid.UUID | None = Form(None),
+    empresa: Literal["nido", "fega"] | None = Form(
+        None, description="Solo obligatorio para un admin con acceso a ambas empresas"
+    ),
     user: User = Depends(get_current_user),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
     obra = get_obra_or_404(db, obra_id)
-    ensure_obra_access(db, obra, user)
+    ensure_obra_access(db, obra, user, scope)
 
+    entry = None
     if work_entry_id is not None:
         entry = db.get(WorkEntry, work_entry_id)
         if entry is None or entry.obra_id != obra.id:
@@ -98,6 +117,9 @@ def upload_media(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="El parte indicado no existe en esta obra",
             )
+
+    media_empresa_id = resolve_upload_empresa(db, user, empresa, entry)
+    ensure_obra_matches_empresa(obra, media_empresa_id)
 
     saved: list[dict] = []
     media_rows: list[MediaFile] = []
@@ -110,6 +132,7 @@ def upload_media(
                     id=meta["id"],
                     obra_id=obra.id,
                     user_id=user.id,
+                    empresa_id=media_empresa_id,
                     work_entry_id=work_entry_id,
                     kind=meta["kind"],
                     original_filename=upload.filename or f"{meta['id']}.{meta['ext']}",
@@ -147,10 +170,11 @@ def list_obra_media(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     user: User = Depends(get_current_user),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
     obra = get_obra_or_404(db, obra_id)
-    ensure_obra_access(db, obra, user)
+    ensure_obra_access(db, obra, user, scope)
 
     filters = [MediaFile.obra_id == obra.id]
     if kind is not None:
@@ -169,6 +193,9 @@ def list_obra_media(
             MediaFile.uploaded_at
             < datetime.combine(to_date + timedelta(days=1), time.min, tzinfo=timezone.utc)
         )
+    empresa_condition = scope.condition_for(MediaFile.empresa_id)
+    if empresa_condition is not None:
+        filters.append(empresa_condition)
 
     total = db.scalar(select(func.count()).select_from(MediaFile).where(*filters))
     rows = db.execute(
@@ -193,16 +220,20 @@ def list_obra_media(
 def recent_media(
     limit: int = Query(12, ge=1, le=50),
     _admin: User = Depends(require_admin),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
     """Latest uploads across all obras, for the admin dashboard."""
-    rows = db.execute(
+    stmt = (
         select(MediaFile, User.full_name, Obra.name)
         .join(User, User.id == MediaFile.user_id)
         .join(Obra, Obra.id == MediaFile.obra_id)
         .order_by(MediaFile.uploaded_at.desc())
         .limit(limit)
-    ).all()
+    )
+    stmt = scope.apply(stmt, MediaFile.empresa_id)
+    stmt = scope.filter_obras(stmt)
+    rows = db.execute(stmt).all()
     items = []
     for media, full_name, obra_name in rows:
         out = _media_out(media, full_name)
@@ -233,14 +264,19 @@ def _unique_arcname(filename: str, used: set[str]) -> str:
 def export_obra_media_zip(
     obra_id: uuid.UUID,
     kind: Literal["photo", "video"] | None = None,
-    _admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
     """Download every media file of an obra as a ZIP (admin)."""
     obra = get_obra_or_404(db, obra_id)
+    ensure_obra_access(db, obra, admin, scope)
     filters = [MediaFile.obra_id == obra.id]
     if kind is not None:
         filters.append(MediaFile.kind == kind)
+    empresa_condition = scope.condition_for(MediaFile.empresa_id)
+    if empresa_condition is not None:
+        filters.append(empresa_condition)
     medias = db.scalars(
         select(MediaFile).where(*filters).order_by(MediaFile.uploaded_at)
     ).all()
@@ -273,10 +309,11 @@ def export_obra_media_zip(
 def download_media(
     media_id: uuid.UUID,
     user: User = Depends(get_current_user),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
     media = _get_media_or_404(db, media_id)
-    _ensure_media_access(db, media, user)
+    _ensure_media_access(db, media, user, scope)
     path = storage.media_abs_path(media.storage_path)
     if not path.is_file():
         raise HTTPException(
@@ -293,10 +330,11 @@ def download_media(
 def download_thumbnail(
     media_id: uuid.UUID,
     user: User = Depends(get_current_user),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
     media = _get_media_or_404(db, media_id)
-    _ensure_media_access(db, media, user)
+    _ensure_media_access(db, media, user, scope)
     if not media.thumbnail_path:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Miniatura no disponible"
@@ -314,9 +352,11 @@ def update_media(
     media_id: uuid.UUID,
     body: MediaUpdate,
     user: User = Depends(get_current_user),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
     media = _get_media_or_404(db, media_id)
+    _ensure_media_in_scope(media, scope)
     if user.role != "admin" and media.user_id != user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -332,9 +372,11 @@ def update_media(
 def delete_media(
     media_id: uuid.UUID,
     user: User = Depends(get_current_user),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
     media = _get_media_or_404(db, media_id)
+    _ensure_media_in_scope(media, scope)
     if user.role != "admin":
         if media.user_id != user.id:
             raise HTTPException(

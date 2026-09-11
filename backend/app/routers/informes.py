@@ -9,8 +9,8 @@ from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.deps import get_db, get_obra_or_404, require_admin
-from app.models import MediaFile, Obra, User, WorkEntry
+from app.deps import EmpresaScope, ensure_obra_access, get_db, get_obra_or_404, require_admin, scope_empresa
+from app.models import Empresa, MediaFile, Obra, User, WorkEntry
 from app.schemas.informes import (
     HorasEntryRow,
     HorasReportOut,
@@ -56,13 +56,24 @@ _MEDIA_COUNT_SUBQ = (
 )
 
 
-def _entries_detail(db, obra_id, user_id, from_date, to_date, validated=None) -> list[HorasEntryRow]:
+def _entries_detail(
+    db, scope: EmpresaScope, obra_id, user_id, from_date, to_date, validated=None
+) -> list[HorasEntryRow]:
     stmt = (
-        select(WorkEntry, Obra.name, User.full_name, User.trade, _MEDIA_COUNT_SUBQ)
+        select(
+            WorkEntry,
+            Obra.name,
+            User.full_name,
+            User.trade,
+            _MEDIA_COUNT_SUBQ,
+            Empresa.nombre,
+        )
         .join(Obra, Obra.id == WorkEntry.obra_id)
         .join(User, User.id == WorkEntry.user_id)
+        .outerjoin(Empresa, Empresa.id == WorkEntry.empresa_id)
         .order_by(WorkEntry.work_date.desc(), Obra.name, User.full_name)
     )
+    stmt = scope.apply(stmt, WorkEntry.empresa_id)
     stmt = _entries_filter(stmt, obra_id, user_id, from_date, to_date, validated)
     return [
         HorasEntryRow(
@@ -78,12 +89,17 @@ def _entries_detail(db, obra_id, user_id, from_date, to_date, validated=None) ->
             validated=entry.validated,
             edited_by_admin=entry.edited_by_admin,
             media_count=media_count,
+            empresa_nombre=empresa_nombre,
         )
-        for entry, obra_name, full_name, trade, media_count in db.execute(stmt).all()
+        for entry, obra_name, full_name, trade, media_count, empresa_nombre in db.execute(
+            stmt
+        ).all()
     ]
 
 
-def _horas_report_data(db, obra_id, user_id, from_date, to_date, validated=None) -> HorasReportOut:
+def _horas_report_data(
+    db, scope: EmpresaScope, obra_id, user_id, from_date, to_date, validated=None
+) -> HorasReportOut:
     stmt = (
         select(
             Obra.id,
@@ -99,6 +115,7 @@ def _horas_report_data(db, obra_id, user_id, from_date, to_date, validated=None)
         .group_by(Obra.id, Obra.name, User.id, User.full_name, User.trade)
         .order_by(Obra.name, User.full_name)
     )
+    stmt = scope.apply(stmt, WorkEntry.empresa_id)
     stmt = _entries_filter(stmt, obra_id, user_id, from_date, to_date, validated)
 
     rows = []
@@ -116,7 +133,7 @@ def _horas_report_data(db, obra_id, user_id, from_date, to_date, validated=None)
         )
     return HorasReportOut(
         rows=rows,
-        entries=_entries_detail(db, obra_id, user_id, from_date, to_date, validated),
+        entries=_entries_detail(db, scope, obra_id, user_id, from_date, to_date, validated),
         by_trade=_group_by_trade(rows),
         total_hours=sum((r.total_hours for r in rows), Decimal("0")),
         total_entries=sum(r.entry_count for r in rows),
@@ -142,9 +159,10 @@ def horas_report(
     to_date: date | None = Query(None, alias="to"),
     validated: bool | None = None,
     _admin: User = Depends(require_admin),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
-    return _horas_report_data(db, obra_id, user_id, from_date, to_date, validated)
+    return _horas_report_data(db, scope, obra_id, user_id, from_date, to_date, validated)
 
 
 def _export_filename(base: str, from_date: date | None, to_date: date | None, ext: str) -> str:
@@ -175,12 +193,17 @@ def horas_export_pdf(
     to_date: date | None = Query(None, alias="to"),
     validated: bool | None = None,
     _admin: User = Depends(require_admin),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
     from app.services.report_pdf import build_horas_pdf
 
-    data = _horas_report_data(db, obra_id, user_id, from_date, to_date, validated)
-    pdf = build_horas_pdf(data, **_report_labels(db, obra_id, user_id, from_date, to_date))
+    data = _horas_report_data(db, scope, obra_id, user_id, from_date, to_date, validated)
+    pdf = build_horas_pdf(
+        data,
+        show_empresa=scope.unrestricted,
+        **_report_labels(db, obra_id, user_id, from_date, to_date),
+    )
     filename = _export_filename("informe_horas", from_date, to_date, "pdf")
     return Response(
         content=pdf,
@@ -197,12 +220,17 @@ def horas_export_xlsx(
     to_date: date | None = Query(None, alias="to"),
     validated: bool | None = None,
     _admin: User = Depends(require_admin),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
     from app.services.report_xlsx import build_horas_xlsx
 
-    data = _horas_report_data(db, obra_id, user_id, from_date, to_date, validated)
-    xlsx = build_horas_xlsx(data, **_report_labels(db, obra_id, user_id, from_date, to_date))
+    data = _horas_report_data(db, scope, obra_id, user_id, from_date, to_date, validated)
+    xlsx = build_horas_xlsx(
+        data,
+        show_empresa=scope.unrestricted,
+        **_report_labels(db, obra_id, user_id, from_date, to_date),
+    )
     filename = _export_filename("informe_horas", from_date, to_date, "xlsx")
     return Response(
         content=xlsx,
@@ -219,35 +247,41 @@ def horas_export_csv(
     to_date: date | None = Query(None, alias="to"),
     validated: bool | None = None,
     _admin: User = Depends(require_admin),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
     stmt = (
-        select(WorkEntry, Obra.name, User.full_name, User.trade)
+        select(WorkEntry, Obra.name, User.full_name, User.trade, Empresa.nombre)
         .join(Obra, Obra.id == WorkEntry.obra_id)
         .join(User, User.id == WorkEntry.user_id)
+        .outerjoin(Empresa, Empresa.id == WorkEntry.empresa_id)
         .order_by(Obra.name, User.full_name, WorkEntry.work_date)
     )
+    stmt = scope.apply(stmt, WorkEntry.empresa_id)
     stmt = _entries_filter(stmt, obra_id, user_id, from_date, to_date, validated)
 
+    show_empresa = scope.unrestricted
     buffer = io.StringIO()
     writer = csv.writer(buffer, delimiter=";")
-    writer.writerow(
-        ["obra", "trabajador", "oficio", "fecha", "inicio", "fin", "horas", "validado", "notas"]
-    )
-    for entry, obra_name, full_name, trade in db.execute(stmt).all():
-        writer.writerow(
-            [
-                obra_name,
-                full_name,
-                trade or "",
-                entry.work_date.isoformat(),
-                entry.start_time.strftime("%H:%M") if entry.start_time else "",
-                entry.end_time.strftime("%H:%M") if entry.end_time else "",
-                hours_hm(entry.hours),
-                "Sí" if entry.validated else "No",
-                entry.notes or "",
-            ]
-        )
+    header = ["obra", "trabajador", "oficio", "fecha", "inicio", "fin", "horas", "validado", "notas"]
+    if show_empresa:
+        header.append("empresa")
+    writer.writerow(header)
+    for entry, obra_name, full_name, trade, empresa_nombre in db.execute(stmt).all():
+        row = [
+            obra_name,
+            full_name,
+            trade or "",
+            entry.work_date.isoformat(),
+            entry.start_time.strftime("%H:%M") if entry.start_time else "",
+            entry.end_time.strftime("%H:%M") if entry.end_time else "",
+            hours_hm(entry.hours),
+            "Sí" if entry.validated else "No",
+            entry.notes or "",
+        ]
+        if show_empresa:
+            row.append(empresa_nombre or "Sin asignar")
+        writer.writerow(row)
 
     filename = _export_filename("horas", from_date, to_date, "csv")
     # BOM so Excel (es-ES) opens the UTF-8 file with accents intact
@@ -261,12 +295,14 @@ def horas_export_csv(
 @router.get("/obra/{obra_id}/resumen", response_model=ObraResumenOut)
 def obra_resumen(
     obra_id: uuid.UUID,
-    _admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin),
+    scope: EmpresaScope = Depends(scope_empresa),
     db: Session = Depends(get_db),
 ):
     obra = get_obra_or_404(db, obra_id)
+    ensure_obra_access(db, obra, admin, scope)
 
-    worker_rows = db.execute(
+    worker_stmt = (
         select(
             User.id,
             User.full_name,
@@ -278,7 +314,9 @@ def obra_resumen(
         .where(WorkEntry.obra_id == obra.id)
         .group_by(User.id, User.full_name, User.trade)
         .order_by(User.full_name)
-    ).all()
+    )
+    worker_stmt = scope.apply(worker_stmt, WorkEntry.empresa_id)
+    worker_rows = db.execute(worker_stmt).all()
     workers = []
     for u_id, u_name, trade, hours, count in worker_rows:
         workers.append(
@@ -291,21 +329,23 @@ def obra_resumen(
             )
         )
 
-    first_date, last_date = db.execute(
+    date_stmt = scope.apply(
         select(func.min(WorkEntry.work_date), func.max(WorkEntry.work_date)).where(
             WorkEntry.obra_id == obra.id
-        )
-    ).one()
-    photo_count = db.scalar(
-        select(func.count()).where(
-            MediaFile.obra_id == obra.id, MediaFile.kind == "photo"
-        )
+        ),
+        WorkEntry.empresa_id,
     )
-    video_count = db.scalar(
-        select(func.count()).where(
-            MediaFile.obra_id == obra.id, MediaFile.kind == "video"
-        )
-    )
+    first_date, last_date = db.execute(date_stmt).one()
+
+    media_filters_base = [MediaFile.obra_id == obra.id]
+    media_condition = scope.condition_for(MediaFile.empresa_id)
+    photo_filters = media_filters_base + [MediaFile.kind == "photo"]
+    video_filters = media_filters_base + [MediaFile.kind == "video"]
+    if media_condition is not None:
+        photo_filters.append(media_condition)
+        video_filters.append(media_condition)
+    photo_count = db.scalar(select(func.count()).where(*photo_filters))
+    video_count = db.scalar(select(func.count()).where(*video_filters))
 
     return ObraResumenOut(
         obra_id=obra.id,
