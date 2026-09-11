@@ -3,7 +3,7 @@ from typing import Generator, Literal
 
 from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import Select, or_
+from sqlalchemy import Select, and_, or_
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
@@ -94,6 +94,30 @@ class EmpresaScope:
         """Filter a select() on a direct nullable empresa_id column."""
         condition = self.condition_for(column)
         return stmt if condition is None else stmt.where(condition)
+
+    def allows_user(self, target: User) -> bool:
+        """Like allows_empresa_id, but for a *user* row specifically.
+
+        An admin with acceso_todas_empresas also has empresa_id IS NULL, same
+        as a pending worker — but it means the opposite thing (access to
+        everything, not access to nothing). Such an account must only be
+        manageable by another admin whose own scope is unrestricted, never
+        leaked into a single-empresa admin's user list or edit/delete access.
+        """
+        if target.role == "admin" and target.acceso_todas_empresas:
+            return self.unrestricted
+        return self.allows_empresa_id(target.empresa_id)
+
+    def filter_users(self, stmt: Select) -> Select:
+        """Filter a select() that has User in its FROM, per allows_user's rule."""
+        if self.unrestricted:
+            return stmt
+        return stmt.where(
+            or_(
+                User.empresa_id.in_(self.empresa_ids),
+                and_(User.empresa_id.is_(None), User.acceso_todas_empresas.is_(False)),
+            )
+        )
 
     def allows_obra(self, obra: Obra) -> bool:
         """Whether an obra (via its obra_empresas rows) is in scope."""

@@ -32,7 +32,7 @@ def _temp_password(length: int = 10) -> str:
 
 def _get_usuario_in_scope_or_404(db: Session, user_id: uuid.UUID, scope: EmpresaScope) -> User:
     user = db.get(User, user_id)
-    if user is None or not scope.allows_empresa_id(user.empresa_id):
+    if user is None or not scope.allows_user(user):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
         )
@@ -46,7 +46,7 @@ def list_usuarios(
     db: Session = Depends(get_db),
 ):
     stmt = select(User).order_by(User.full_name)
-    stmt = scope.apply(stmt, User.empresa_id)
+    stmt = scope.filter_users(stmt)
     return db.scalars(stmt).all()
 
 
@@ -111,7 +111,7 @@ def asignar_empresa_usuarios(
     are never left pending (see the CHECK constraints on empresa scope)."""
     users = db.scalars(select(User).where(User.id.in_(body.user_ids))).all()
     if len(users) != len(set(body.user_ids)) or any(
-        not scope.allows_empresa_id(u.empresa_id) for u in users
+        not scope.allows_user(u) for u in users
     ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

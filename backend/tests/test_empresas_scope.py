@@ -204,6 +204,56 @@ def test_admin_ambas_must_pick_empresa_to_upload(client, obra, admin_headers):
 # --- usuarios ----------------------------------------------------------
 
 
+def test_single_empresa_admin_cannot_see_omni_admin_in_list(
+    client, admin_nido_headers, admin, admin_nido
+):
+    # `admin` (acceso_todas_empresas=True) has empresa_id NULL, same storage
+    # shape as a pending worker — but it must never leak the same way.
+    res = client.get("/api/v1/usuarios", headers=admin_nido_headers)
+    assert res.status_code == 200
+    usernames = {u["username"] for u in res.json()}
+    assert admin.username not in usernames
+    assert admin_nido.username in usernames
+
+
+def test_single_empresa_admin_404_on_omni_admin_detail_actions(
+    client, admin_nido_headers, admin
+):
+    res = client.patch(
+        f"/api/v1/usuarios/{admin.id}", json={"is_active": False}, headers=admin_nido_headers
+    )
+    assert res.status_code == 404
+    res = client.delete(f"/api/v1/usuarios/{admin.id}", headers=admin_nido_headers)
+    assert res.status_code == 404
+    res = client.get(f"/api/v1/usuarios/{admin.id}/password", headers=admin_nido_headers)
+    assert res.status_code == 404
+
+
+def test_omni_admin_sees_and_can_manage_another_omni_admin(client, db_session, admin_headers):
+    from app.models import User
+    from app.security import hash_password
+
+    other_omni = User(
+        username="otro-admin-todas",
+        full_name="Otro Admin Todas",
+        password_hash=hash_password("x"),
+        role="admin",
+        must_change_password=False,
+        acceso_todas_empresas=True,
+    )
+    db_session.add(other_omni)
+    db_session.commit()
+
+    res = client.get("/api/v1/usuarios", headers=admin_headers)
+    assert res.status_code == 200
+    assert other_omni.username in {u["username"] for u in res.json()}
+
+    res = client.patch(
+        f"/api/v1/usuarios/{other_omni.id}", json={"trade": "Fontanero"}, headers=admin_headers
+    )
+    assert res.status_code == 200
+
+
 def test_admin_creates_worker_in_any_empresa_regardless_of_own_scope(
     client, admin_nido_headers, empresa_fega
 ):
