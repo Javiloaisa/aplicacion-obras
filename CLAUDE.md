@@ -2,13 +2,13 @@
 
 ## Qué es este proyecto
 
-Sistema para una empresa de construcción/instalaciones formado por **dos aplicaciones separadas** que comparten una misma API y base de datos:
+Sistema **multiempresa** (dos empresas comparten app y servidor: **Nido Constructions**, construcción, y **Fega Juan**, fontanería/electricidad) formado por **dos aplicaciones separadas** que comparten una misma API y base de datos:
 
 1. **`app-trabajador/`** — PWA móvil, instalable, mínima y muy simple: los trabajadores suben fotos y vídeos de la obra y registran sus horas trabajadas.
-2. **`panel-admin/`** — Aplicación web para el jefe (escritorio principalmente): gestiona obras, asigna trabajadores, revisa todo el material multimedia, consulta y edita las horas, y exporta informes.
+2. **`panel-admin/`** — Aplicación web para el jefe (escritorio principalmente): gestiona obras, revisa todo el material multimedia, consulta y edita las horas, y exporta informes.
 3. **`backend/`** — API REST común (FastAPI + PostgreSQL) que sirve a las dos.
 
-La especificación funcional completa está en `ESPECIFICACION.md`. **Léela antes de escribir código.**
+La especificación funcional completa está en `ESPECIFICACION.md`, incluida la sección **§11 (Multiempresa)** con el modelo de datos, el ámbito por empresa (`scope_empresa`) y las reglas de transición del periodo actual (clasificación manual, `empresa_id` nullable). **Léela antes de escribir código**, y en particular antes de tocar cualquier endpoint que liste o modifique obras, partes, media, usuarios o bloqueos: casi todos deben pasar por `scope_empresa`.
 
 ## Stack (no cambiar sin preguntar)
 
@@ -37,9 +37,10 @@ La especificación funcional completa está en `ESPECIFICACION.md`. **Léela ant
 │   │   ├── database.py
 │   │   ├── models/            # SQLAlchemy models
 │   │   ├── schemas/           # Pydantic schemas
-│   │   ├── routers/           # auth, obras, partes, media, usuarios, informes
-│   │   ├── services/          # storage, thumbnails, export
-│   │   └── deps.py            # get_db, get_current_user, require_admin
+│   │   ├── routers/           # auth, obras, partes, media, usuarios, informes, bloqueos, empresas, me
+│   │   ├── services/          # storage, thumbnails, export, empresas (scope + herencia)
+│   │   ├── scripts/           # asignar_usuario.py (CLI de recuperación, no forma parte del alta normal)
+│   │   └── deps.py            # get_db, get_current_user, require_admin, scope_empresa/EmpresaScope
 │   ├── alembic/
 │   ├── tests/
 │   ├── requirements.txt
@@ -55,9 +56,9 @@ La especificación funcional completa está en `ESPECIFICACION.md`. **Léela ant
 │   └── Dockerfile
 └── panel-admin/               # Panel del jefe
     ├── src/
-    │   ├── pages/             # Dashboard, Obras, ObraDetalle, Informes, Usuarios
+    │   ├── pages/             # Dashboard, Obras, ObraDetalle, Informes, Usuarios, Bloqueos, SinAsignar
     │   ├── components/
-    │   ├── lib/               # api client, auth
+    │   ├── lib/               # api client, auth, empresa-filtro (selector de cabecera)
     │   └── App.tsx
     ├── vite.config.ts
     └── Dockerfile
@@ -72,6 +73,7 @@ Crear un pequeño paquete compartido NO es necesario: los tipos TypeScript de la
 - Toda ruta protegida por JWT salvo `/api/v1/auth/login` y `/health`.
 - El login en `panel-admin` rechaza usuarios con rol `worker`; el de `app-trabajador` acepta ambos roles pero solo muestra la vista de trabajador.
 - Rutas de admin protegidas con dependencia `require_admin` en el backend (la separación de frontends NO es una medida de seguridad: la seguridad vive en la API).
+- Todo endpoint que liste o devuelva obras, partes, media, usuarios, bloqueos o informes debe llevar `scope: EmpresaScope = Depends(scope_empresa)` (ver `ESPECIFICACION.md` §11) y usarlo de verdad, no solo declararlo. Un recurso fuera de ámbito responde **404**, nunca 403. `empresa_id` en partes/media se asigna siempre en el backend, nunca se acepta del body. Los frontends no filtran por empresa por su cuenta — solo mandan el `empresa` que el usuario elige en el selector; la seguridad vive en `scope_empresa`, igual que con roles.
 - Migraciones siempre con Alembic; nunca `create_all` en producción.
 - Validar tipo y tamaño de archivos en el backend: fotos JPEG/PNG/WebP/HEIC máx 15 MB, vídeos MP4/MOV/WebM máx 200 MB. Verificar magic bytes, no solo extensión.
 - Archivos guardados como `/data/media/{obra_id}/{uuid}.{ext}` + miniatura `{uuid}_thumb.jpg`. Nombre original en BD.
@@ -117,3 +119,4 @@ docker compose up -d --build
 - No guardar datos personales sensibles más allá de nombre, email/usuario y teléfono opcional.
 - No exponer la BD ni la API directamente: todo pasa por Caddy.
 - No convertir el panel-admin en PWA ni añadirle modo offline: no lo necesita.
+- No reclasificar automáticamente usuarios u obras existentes con `empresa_id NULL`: lo hace el gerente a mano desde "Sin asignar" (o `app/scripts/asignar_usuario.py` como recuperación). No lanzar la migración final que pondría `empresa_id NOT NULL` (§11 de `ESPECIFICACION.md`) sin que te lo pidan explícitamente.
